@@ -13,6 +13,7 @@ PLAYER_ALREADY_ROLLED = 1
 RETAIN = 1200 # 20 minutes
 URL_TRIVIA = 'https://opentdb.com/api.php?amount=1&type=multiple'
 TRIVIA_COMMAND = '!ramswoertherevival'
+FILE_TOKEN = 'token_mexbot'
 
 # GAME CLASSES -----------------------------------
 
@@ -350,4 +351,4 @@ async def on_message(message):
         #await message.channel.send(response, delete_after=RETAIN)
         await message.channel.send(response)
 
-client.run('ODAwNDAzNTk2OTM2MDg1NTU1.YARn8A.Ff8-akEWPqBC-pNdWdhwYAcACWA')
+client.run(open(FILE_TOKEN).read())
