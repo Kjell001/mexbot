@@ -1,3 +1,4 @@
+import os
 import urllib.request
 import json
 from html import unescape
@@ -13,7 +14,7 @@ PLAYER_ALREADY_ROLLED = 1
 RETAIN = 1200 # 20 minutes
 URL_TRIVIA = 'https://opentdb.com/api.php?amount=1&type=multiple'
 TRIVIA_COMMAND = '!ramswoertherevival'
-FILE_TOKEN = 'token_mexbot'
+TOKEN_KJELLBOT = os.getenv("TOKEN_KJELLBOT")
 
 # GAME CLASSES -----------------------------------
 
@@ -351,4 +352,5 @@ async def on_message(message):
         #await message.channel.send(response, delete_after=RETAIN)
         await message.channel.send(response)
 
-client.run(open(FILE_TOKEN).read())
+print("Token used:\n{}\n".format(TOKEN_KJELLBOT))
+client.run(TOKEN_KJELLBOT)
