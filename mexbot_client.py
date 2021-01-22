@@ -14,7 +14,7 @@ PLAYER_ALREADY_ROLLED = 1
 RETAIN = 1200 # 20 minutes
 URL_TRIVIA = 'https://opentdb.com/api.php?amount=1&type=multiple'
 TRIVIA_COMMAND = '!ramswoertherevival'
-TOKEN_KJELLBOT = os.getenv("TOKEN_KJELLBOT")
+TOKEN_DISCORD_BOT = os.getenv("TOKEN_DISCORD_BOT")
 
 # GAME CLASSES -----------------------------------
 
@@ -352,5 +352,4 @@ async def on_message(message):
         #await message.channel.send(response, delete_after=RETAIN)
         await message.channel.send(response)
 
-print("Token used:\n{}\n".format(TOKEN_KJELLBOT))
-client.run(TOKEN_KJELLBOT)
+client.run(TOKEN_DISCORD_BOT)
