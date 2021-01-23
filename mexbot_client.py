@@ -5,9 +5,11 @@ from html import unescape
 from random import randint, shuffle, choice
 from copy import deepcopy
 import discord
+from discord.ext import commands
+from discord.ext.commands import CommandNotFound
 
 
-# CONSTANTS --------------------------------------
+# GAME CONSTANTS ---------------------------------
 
 HUGE = float('inf')
 PLAYER_ALREADY_ROLLED = 1
@@ -15,17 +17,18 @@ RETAIN = 1200 # 20 minutes
 URL_TRIVIA = 'https://opentdb.com/api.php?amount=1&type=multiple'
 TRIVIA_COMMAND = '!ramswoertherevival'
 TOKEN_DISCORD_BOT = os.getenv("TOKEN_DISCORD_BOT")
+USER_ID_OWNER = 420265213451829269
 
 # GAME CLASSES -----------------------------------
 
-class Dice(object):
+class Roll(object):
     def __init__(self, values=None):
         self.fresh = [True, True]
         if values:
             self.values = values.copy()
         else:
             self.values = [0, 0]
-            self.roll()
+            self.reroll()
 
     def first(self):
         return self.values[0], self.fresh[0]
@@ -33,7 +36,7 @@ class Dice(object):
     def second(self):
         return self.values[1], self.fresh[1]
 
-    def roll(self, a=True, b=True):
+    def reroll(self, a=True, b=True):
         if a:
             self.values[0] = randint(1, Rules.SIDES_DICE)
             self.fresh[0] = True
@@ -46,7 +49,7 @@ class Dice(object):
             self.fresh[1] = False
 
     def score(self):
-        if self == Rules.DICE_MEX:
+        if set(self.values) == set(Rules.VALUES_KEEP):
             return HUGE
         elif self.values[0] == self.values[1]:
             return 100 * self.values[0]
@@ -60,7 +63,7 @@ class Dice(object):
         return value in self.values
 
     def __eq__(self, other):
-        return set(self.values) == set(other.values)
+        return self.score() == other.score()
 
     def __lt__(self, other):
         return self.score() < other.score()
@@ -77,17 +80,20 @@ class Dice(object):
     def __repr__(self):
         return 'Dice({}{}, {}{})'.format(
             self.values[0],
-            '' if self.fresh[0] else '*',
+            ' ' if self.fresh[0] else '*',
             self.values[1],
-            '' if self.fresh[1] else '*'
+            ' ' if self.fresh[1] else '*'
         )
 
 
 class Rules(object):
-    DICE_KEEP = Dice([1, 2])
-    DICE_GIVE = Dice([1, 3])
-    DICE_MEX = Dice([1, 2])
-    DICE_IMPOSSIBLE = Dice([9, 9])
+    VALUES_KEEP = [1, 2]
+    VALUES_GIVE = [1, 3]
+    VALUES_MEX = [1, 2]
+    DICE_KEEP = Roll(VALUES_KEEP)
+    DICE_GIVE = Roll(VALUES_GIVE)
+    DICE_MEX = Roll(VALUES_MEX)
+    DICE_IMPOSSIBLE = Roll([9, 9])
     SIDES_DICE = 6
     LIMIT_MIN = 1
     LIMIT_MAX = 3
@@ -108,13 +114,13 @@ class Results(object):
         self.player = player
         self.holdit = False
 
-    def add_roll(self, dice):
-        self.rolls.append(dice)
+    def add_roll(self, roll):
+        self.rolls.append(roll)
 
     def interrupt(self):
         self.holdit = True
 
-    def dice_last(self):
+    def roll_last(self):
         return self.rolls[-1]
 
     def get(self):
@@ -151,7 +157,6 @@ class Results(object):
         return self.rolls, labels, charms
 
 
-
 class Game(object):
     def __init__(self, roll_limit=3):
         self.limit = min(max(Rules.LIMIT_MIN, roll_limit), Rules.LIMIT_MAX)
@@ -168,23 +173,23 @@ class Game(object):
         self.players.append(player)
         # Setup
         results = Results(self, player)
-        dice = Dice()
+        roll = Roll()
         roll_num = 1
         # Throw dice
         while roll_num <= self.limit:
-            results.add_roll(dice.snapshot())
-            value1, fresh1 = dice.first()
-            value2, fresh2 = dice.second()
+            results.add_roll(roll.snapshot())
+            value1, fresh1 = roll.first()
+            value2, fresh2 = roll.second()
             # Identify special situations
-            if self.roll_low and dice == self.roll_low and roll_num < self.limit:
+            if self.roll_low and roll == self.roll_low and roll_num < self.limit:
                 # Check if this identical to lowest pair in game
                 results.interrupt()
                 break
-            elif dice == Rules.DICE_GIVE:
+            elif roll == Rules.DICE_GIVE:
                 # Give, extra round
-                dice.roll()
+                roll.reroll()
                 continue
-            elif dice == Rules.DICE_MEX:
+            elif roll == Rules.DICE_MEX:
                 # Mex
                 if len(self.players) == 1:
                     self.limit = roll_num
@@ -192,48 +197,30 @@ class Game(object):
                 break
             elif value1 in Rules.DICE_KEEP and fresh1:
                 # Keep first dice
-                dice.roll(False, True)
+                roll.reroll(False, True)
             elif value2 in Rules.DICE_KEEP and fresh2:
                 # Keep second dice
-                dice.roll(True, False)
+                roll.reroll(True, False)
             else:
-                dice.roll()
+                roll.reroll()
             # Increment roll count
             roll_num += 1
         # Update game state
-        dice_last = results.dice_last()
-        if self.roll_low and dice_last == self.roll_low:
+        roll_last = results.roll_last()
+        if self.roll_low and roll_last == self.roll_low:
             self.players_low.append(player)
-        elif not self.roll_low or dice_last <= self.roll_low:
+        elif not self.roll_low or roll_last <= self.roll_low:
             self.players_low = [player]
-            self.roll_low = dice_last.snapshot()
+            self.roll_low = roll_last.snapshot()
         return results
 
 
-# TRIVIA -----------------------------------------
+# BOT CONSTANTS ----------------------------------
 
-def get_trivia_response():
-    # Fetch trivia
-    with urllib.request.urlopen(URL_TRIVIA) as url:
-        data = json.loads(url.read().decode())
-    trivia = data['results'][0]
-    question = unescape(trivia['question'])
-    answer_correct = unescape(trivia['correct_answer'])
-    answers = [unescape(a) for a in trivia['incorrect_answers']]
-    answers.append(answer_correct)
-    # Format
-    line_quiz = '*Secret quiz time: {}*\n'.format(question)
-    lines_answers = []
-    for i, answer in enumerate(answers):
-        lines_answers.append('|| {} ||  {}'.format(
-            '✅' if i == len(answers) - 1 else '❌',
-            answer
-        ))
-    shuffle(lines_answers)
-    return line_quiz + '\n'.join(lines_answers)
+class Args:
+    NEW_GAME = ('start', 'nieuw', 'new')
+    ROLL_LIMIT_DEFAULT = 3
 
-
-# PHRASES ----------------------------------------
 
 class Phrases:
     START = (
@@ -258,9 +245,7 @@ class Phrases:
     }
 
 
-# CONNECT TO DISCORD -----------------------------
-
-client = discord.Client()
+# HELPERS ----------------------------------------
 emojis = dict()
 games = dict()
 
@@ -280,76 +265,104 @@ def list_names(names):
     else:
         return ', '.join(names[:-1]) + ' en ' + names[-1]
 
-@client.event
+
+# CONNECT TO DISCORD -----------------------------
+
+bot = commands.Bot(command_prefix='!')
+
+@bot.event
 async def on_ready():
-    global emojis
-    print('Logged in as {0.user}'.format(client))
+    print('Logged in as {}'.format(bot.user))
+    await bot.change_presence(activity=discord.Game("Mex"))
     # Fetch emojis
-    emojis = dict([(e.name, '<:' + e.name + ':' + str(e.id) + '>') for e in client.emojis])
+    global emojis
+    emojis = dict((e.name, f'<:{e.name}:{str(e.id)}>') for e in bot.emojis)
 
-@client.event
-async def on_message(message):
-    # OWN MESSAGE
-    if message.author == client.user:
+@bot.event
+async def on_command_error(ctx, error):
+    if isinstance(error, CommandNotFound):
         return
-    # TRIVIA
-    elif message.content.replace(' ', '').lower() == TRIVIA_COMMAND:
-        response = get_trivia_response()
-        await message.channel.send(response)
-    # MEX
-    elif message.content.startswith('!mex'):
-        global emojis, Phrases
-        # Parse arguments
-        args = message.content.lower().split()
-        new_game = len(args) > 1 and args[1] == 'start'
-        try:
-            roll_limit = int(args[2]) if len(args) > 2 else 3
-        except ValueError:
-            roll_limit = 3
-        # Get info
-        channel_id = message.channel.id
-        user_id = message.author.id
-        user_mention = '<@{}>'.format(user_id)
-        # Determine current game
-        game = games.get(channel_id)
-        if new_game or game is None:
-            game = Game(roll_limit)
-            games[channel_id] = game
-        # Play a turn
-        results = game.turn(user_mention)
-        # Construct response
-        if results == PLAYER_ALREADY_ROLLED:
-            response = choice(Phrases.CHEAT).format(user_mention)
-        else:
-            # Announce
-            line_user = choice(Phrases.START).format(user_mention)
-            # Display rolls
-            lines_roll = list()
-            rolls, labels, charms = results.get()
-            for i in range(len(rolls)):
-                str_label = '` {} `'.format(labels[i])
-                str_roll = roll_icons(rolls[i])
-                str_charms = '  '.join(Phrases.CHARM[c] for c in charms[i])
-                lines_roll.append('{}  {}{}{}'.format(
-                    str_label,
-                    str_roll,
-                    '  ' if str_charms else '',
-                    str_charms
-                ))
-            # Display game status
-            line_game = '{} {} laag met {}'.format(
-                list_names(game.players_low),
-                'zijn' if len(game.players_low) > 1 else 'is',
-                roll_icons(game.roll_low, False)
-            )
-            if game.limit < game.limit_init:
-                line_game = 'Mex in {}  ◇  '.format(game.limit) + line_game
-            if game.mex > 0:
-                line_game += '  ◇  {} mex'.format(game.mex)
-            # Put response together
-            response = line_user + '\n\n' + '\n\n'.join(lines_roll) + '\n\n' + line_game
-        # Post response
-        #await message.channel.send(response, delete_after=RETAIN)
-        await message.channel.send(response)
+    raise error
 
-client.run(TOKEN_DISCORD_BOT)
+@bot.command(name='mex')
+async def _mex(ctx, arg1=None, arg2=None):
+    # Parse arguments
+    new_game = arg1 in Args.NEW_GAME if arg1 else False
+    roll_limit = Args.ROLL_LIMIT_DEFAULT
+    if new_game:
+        try:
+            roll_limit = int(arg2)
+        except (ValueError, TypeError): pass
+    # Get info
+    channel_id = ctx.channel.id
+    user_id = ctx.author.id
+    if user_id == USER_ID_OWNER and ctx.message.mentions:
+        user_id = ctx.message.mentions[0].id
+    user_mention = f'<@{user_id}>'
+    # Determine current game
+    game = games.get(channel_id)
+    if new_game or game is None:
+        game = Game(roll_limit)
+        games[channel_id] = game
+    # Play a turn
+    results = game.turn(user_mention)
+    # Construct response
+    if results == PLAYER_ALREADY_ROLLED:
+        response = choice(Phrases.CHEAT).format(user_mention)
+    else:
+        # Announce
+        line_user = choice(Phrases.START).format(user_mention)
+        # Display rolls
+        lines_roll = list()
+        rolls, labels, charms = results.get()
+        for i in range(len(rolls)):
+            str_label = f'` {labels[i]} `'
+            str_roll = roll_icons(rolls[i])
+            str_charms = '  '.join(Phrases.CHARM[c] for c in charms[i])
+            lines_roll.append('{}  {}{}{}'.format(
+                str_label,
+                str_roll,
+                '  ' if str_charms else '',
+                str_charms
+            ))
+        # Display game status
+        line_game = '{} {} laag met {}'.format(
+            list_names(game.players_low),
+            'zijn' if len(game.players_low) > 1 else 'is',
+            roll_icons(game.roll_low, False)
+        )
+        if game.limit < game.limit_init:
+            line_game = 'Mex in {}  ◇  '.format(game.limit) + line_game
+        if game.mex > 0:
+            line_game += '  ◇  {} mex'.format(game.mex)
+        # Put response together
+        response = line_user + '\n\n' + '\n\n'.join(lines_roll) + '\n\n' + line_game
+    # Post response
+    await ctx.send(response)
+
+
+@bot.command(name='ramswoertherevival')
+async def _quiz(ctx, arg1=None, arg2=None):
+    # Fetch trivia
+    with urllib.request.urlopen(URL_TRIVIA) as url:
+        data = json.loads(url.read().decode())
+    trivia = data['results'][0]
+    question = unescape(trivia['question'])
+    answer_correct = unescape(trivia['correct_answer'])
+    answers = [unescape(a) for a in trivia['incorrect_answers']]
+    answers.append(answer_correct)
+    # Construct quiz content
+    line_quiz = f'*Secret quiz time: {question}*\n'
+    lines_answers = []
+    for i, answer in enumerate(answers):
+        lines_answers.append('|| {} ||  {}'.format(
+            '✅' if i == len(answers) - 1 else '❌',
+            answer
+        ))
+    # Shuffle correct answer in other answers
+    shuffle(lines_answers)
+    # Post response
+    response = line_quiz + '\n'.join(lines_answers)
+    await ctx.send(response)
+
+bot.run(TOKEN_DISCORD_BOT)
