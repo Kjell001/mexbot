@@ -37,7 +37,10 @@ class Phrases:
         '{} grijpt naar de dobbels',
         '{} hoopt op mex',
         '{} ruikt even aan de dobbelstenen',
-        '{} heeft nog geen dorst'
+        '{} heeft nog geen dorst',
+        '{} likt aan de dobbelstenen',
+        '{} gooit de dobbels bijna van tafel',
+        '{} probeert een trick shot'
     )
     CHEAT = (
         '{} CHEATOR COMPLETOR!',
