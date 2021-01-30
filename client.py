@@ -96,6 +96,112 @@ async def on_command_error(ctx, error):
         return
     raise error
 
+# DEFINE COMMANDS --------------------------------
+
+class Mex(commands.Cog):
+    # Constants
+    ROLL_LIMIT_DEFAULT = 3
+    # Phrases
+    START = (
+        '{} werpt de teerling',
+        'De beurt is aan {}',
+        '{} grijpt naar de dobbels',
+        '{} hoopt op mex',
+        '{} ruikt even aan de dobbelstenen',
+        '{} heeft nog geen dorst',
+        '{} likt aan de dobbelstenen',
+        '{} gooit de dobbels bijna van tafel',
+        '{} probeert een trick shot'
+    )
+    CHEAT = (
+        '{} CHEATOR COMPLETOR!',
+        '{} eist een hertelling, maar de uitslag is hetzelfde',
+        '{}, je bent al aan de beurt geweest valsspelert!',
+        'Volgende potje mag je weer {}'
+    )
+    CHARM = {
+        Charms.MEX: '` Mex! `',
+        Charms.GIVE: '` Uitdelen! `',
+        Charms.HOLDIT: '` Vast! `',
+        Charms.HOUSE: '` Huisborrel! `'
+    }
+    # States
+    games = dict()
+    # Helpers
+    get_member = commands.MemberConverter()
+
+    def __init__(self, bot):
+        self.bot = bot
+
+    @commands.Cog.listener()
+    async def on_ready(self):
+        print('Loaded Mex commands')
+
+    @commands.group('mex2', invoke_without_command=True)
+    async def play(self, ctx, proxy_user=None):
+        if proxy_user and (await self.bot.is_owner(ctx.message.author)):
+            try:
+                proxy_user = await self.get_member.convert(ctx, proxy_user)
+            except commands.MemberNotFound:
+                proxy_user = None
+        # Check for a game
+        game = self.games.get(ctx.channel.id)
+        if not game:
+            await self.start(ctx)
+            return
+        # Play a turn
+        player_mention = proxy_user.mention if proxy_user else ctx.message.author.mention
+        results = game.turn(player_mention)
+        # Construct response
+        if results == PLAYER_ALREADY_ROLLED:
+            response = choice(self.CHEAT).format(player_mention)
+        else:
+            # Announce
+            line_user = choice(self.START).format(player_mention)
+            # Display rolls
+            lines_roll = list()
+            rolls, labels, charms = results.get()
+            for i in range(len(rolls)):
+                str_label = f'` {labels[i]} `'
+                str_roll = roll_icons(rolls[i])
+                str_charms = '  '.join(self.CHARM[c] for c in charms[i])
+                lines_roll.append('{}  {}{}{}'.format(
+                    str_label,
+                    str_roll,
+                    '  ' if str_charms else '',
+                    str_charms
+                ))
+            # Display game status
+            line_game = '{} {} laag met {}'.format(
+                list_names(game.players_low),
+                'zijn' if len(game.players_low) > 1 else 'is',
+                roll_icons(game.roll_low, False)
+            )
+            if game.limit < game.limit_init:
+                line_game = f'Mex in {game.limit}  ◇  ' + line_game
+            if game.mex > 0:
+                line_game += f'  ◇  {game.mex} mex'
+            # Put response together
+            response = line_user + '\n\n' + '\n\n'.join(lines_roll) + '\n\n' + line_game
+        # Post response
+        await ctx.send(response)
+
+    @play.group('start', aliases=['new'])
+    async def start(self, ctx, roll_limit = ROLL_LIMIT_DEFAULT):
+        game = Game(roll_limit)
+        self.games[ctx.channel.id] = game
+        author_mention = ctx.message.author.mention
+        await ctx.send(f'**{author_mention} zet op**')
+        await self.play(ctx)
+
+    @play.group('stop', aliases=['end', 'quit'])
+    async def stop(self, ctx):
+        pass
+
+
+bot.add_cog(Mex(bot))
+
+
 @bot.command(name='mex')
 async def _mex(ctx, arg1=None, arg2=None):
     # Parse arguments
