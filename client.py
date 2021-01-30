@@ -6,6 +6,7 @@ from random import shuffle, choice
 
 # API request
 import urllib.request
+import requests
 import json
 from html import unescape
 
@@ -18,14 +19,9 @@ from discord.ext import commands
 from discord.ext.commands import CommandNotFound
 
 
-# CONSTANTS --------------------------------------
-
-URL_TRIVIA = 'https://opentdb.com/api.php?amount=1&type=multiple'
-TOKEN_DISCORD_BOT = os.getenv("TOKEN_DISCORD_BOT")
-
-
 # CONNECT TO DISCORD -----------------------------
 
+TOKEN_DISCORD_BOT = os.getenv("TOKEN_DISCORD_BOT")
 bot = commands.Bot(command_prefix='!')
 
 
@@ -95,7 +91,7 @@ class Mex(commands.Cog):
         else:
             return ', '.join(names[:-1]) + ' en ' + names[-1]
 
-    def make_response(self, results):
+    def make_message(self, results):
         game = results.game
         player = results.player
         # Announce
@@ -123,7 +119,7 @@ class Mex(commands.Cog):
             line_game = f'Mex in {game.limit}  ◇  ' + line_game
         if game.mex > 0:
             line_game += f'  ◇  {game.mex} mex'
-        # Put response together
+        # Put message together
         return line_user + '\n\n' + '\n\n'.join(lines_roll) + '\n\n' + line_game
 
     @commands.Cog.listener()
@@ -148,12 +144,12 @@ class Mex(commands.Cog):
         # Play a turn
         player_mention = proxy_user.mention if proxy_user else ctx.message.author.mention
         results = game.turn(player_mention)
-        # Construct and post response
+        # Construct and post message
         if results == PLAYER_ALREADY_ROLLED:
-            response = choice(self.CHEAT).format(player_mention)
+            message = choice(self.CHEAT).format(player_mention)
         else:
-            response = self.make_response(results)
-        await ctx.send(response)
+            message = self.make_message(results)
+        await ctx.send(message)
 
     @play.group('start', aliases=['new'])
     async def start(self, ctx, roll_limit = ROLL_LIMIT_DEFAULT):
@@ -164,32 +160,57 @@ class Mex(commands.Cog):
         await self.play(ctx)
 
 
+class Quiz(commands.Cog):
+    OPENTDB_ENDPOINT = 'https://opentdb.com/api.php'
+    NO_QUESTION = -1
+
+    def __init__(self, bot):
+        self.bot = bot
+
+    def fetch_question(self):
+        # Make request
+        params = {'amount': 1, 'type': 'multiple'}
+        response = requests.get(self.OPENTDB_ENDPOINT, params)
+        if not 200 <= response.status_code < 300:
+            raise ConnectionError(f'{self.OPENTDB_ENDPOINT} could not be reached.')
+        # Gather data
+        data = json.loads(response.content)
+        trivia = data['results'][0]
+        question = unescape(trivia['question'])
+        answer_correct = unescape(trivia['correct_answer'])
+        answers = [unescape(a) for a in trivia['incorrect_answers']]
+        # Append correct answer to wrong answers
+        answers.append(answer_correct)
+        return question, answers
+
+    def make_message(self, question, answers):
+        # Format question and answers
+        line_quiz = f'*Secret quiz time: {question}*\n'
+        lines_answers = []
+        for i, answer in enumerate(answers):
+            lines_answers.append('|| {} ||  {}'.format(
+                '✅' if i == len(answers) - 1 else '❌',
+                answer
+            ))
+        # Shuffle answers
+        shuffle(lines_answers)
+        # Return message
+        return line_quiz + '\n'.join(lines_answers)
+
+    @commands.Cog.listener()
+    async def on_ready(self):
+        print('Quiz: loaded commands')
+
+    @commands.command('ramswoertherevival', aliases=['rwr'])
+    async def quiz(self, ctx):
+        try:
+            question, answers = self.fetch_question()
+        except ConnectionError as inst:
+            print(inst)
+        else:
+            await ctx.send(self.make_message(question, answers))
+
+
 bot.add_cog(Mex(bot))
-
-
-@bot.command(name='ramswoertherevival')
-async def _quiz(ctx, arg1=None, arg2=None):
-    # Fetch trivia
-    with urllib.request.urlopen(URL_TRIVIA) as url:
-        data = json.loads(url.read().decode())
-    trivia = data['results'][0]
-    question = unescape(trivia['question'])
-    answer_correct = unescape(trivia['correct_answer'])
-    answers = [unescape(a) for a in trivia['incorrect_answers']]
-    answers.append(answer_correct)
-    # Construct quiz content
-    line_quiz = f'*Secret quiz time: {question}*\n'
-    lines_answers = []
-    for i, answer in enumerate(answers):
-        lines_answers.append('|| {} ||  {}'.format(
-            '✅' if i == len(answers) - 1 else '❌',
-            answer
-        ))
-    # Shuffle correct answer in other answers
-    shuffle(lines_answers)
-    # Post response
-    response = line_quiz + '\n'.join(lines_answers)
-    await ctx.send(response)
-
-
+bot.add_cog(Quiz(bot))
 bot.run(TOKEN_DISCORD_BOT)
