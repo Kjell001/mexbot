@@ -163,10 +163,6 @@ class Mex(commands.Cog):
         await ctx.send(f'**{author_mention} zet op**')
         await self.play(ctx)
 
-    @play.group('stop', aliases=['end', 'quit'])
-    async def stop(self, ctx):
-        pass
-
 
 bot.add_cog(Mex(bot))
 
