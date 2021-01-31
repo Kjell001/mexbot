@@ -15,10 +15,7 @@ GAME_UNDECIDED = 2
 GAME_NOT_FOUND = 3
 
 
-class Mex(commands.Cog):
-    # Constants
-    ROLL_LIMIT_DEFAULT = 3
-    # Phrases
+class Phrases(object):
     START = (
         '{} werpt de teerling',
         'De beurt is aan {}',
@@ -52,6 +49,11 @@ class Mex(commands.Cog):
         Charms.HOLDIT: '` Vast! `',
         Charms.HOUSE: '` Huisborrel! `'
     }
+
+
+class Mex(commands.Cog):
+    # Constants
+    ROLL_LIMIT_DEFAULT = 3
     # States
     games = dict()
     games_count = dict()
@@ -81,7 +83,7 @@ class Mex(commands.Cog):
         game = results.game
         player = results.player
         # Announce
-        line_user = choice(self.START).format(player)
+        line_user = choice(Phrases.START).format(player)
         if len(game.players) == 1:
             game_num = self.games_count[ctx.guild.id]
             line_user = f'**Game #{game_num:03d}** ' + line_user
@@ -91,7 +93,7 @@ class Mex(commands.Cog):
         for i in range(len(rolls)):
             str_label = f'` {labels[i]} `'
             str_roll = self.roll_icons(rolls[i])
-            str_charms = '  '.join(self.CHARM[c] for c in charms[i])
+            str_charms = '  '.join(Phrases.CHARM[c] for c in charms[i])
             lines_roll.append('{}  {}{}{}'.format(
                 str_label,
                 str_roll,
@@ -115,7 +117,7 @@ class Mex(commands.Cog):
         game_num = self.games_count[ctx.guild.id]
         message = f'**Game #{game_num:03d} over!**'
         if len(game.players) == 1:
-            message += ' ' + self.ALONE
+            message += ' ' + Phrases.ALONE
         tokens_sorted = sorted(game.tokens.items(), key=lambda x: x[1], reverse=True)
         for player, tokens in tokens_sorted:
             message += (f'\n` 🍺 x{tokens} `  {player}')
@@ -145,13 +147,13 @@ class Mex(commands.Cog):
         results = game.turn(player_mention)
         # Construct and post message
         if results == PLAYER_ALREADY_ROLLED:
-            message = choice(self.CHEAT).format(player_mention)
+            message = choice(Phrases.CHEAT).format(player_mention)
         else:
             message = self.make_message_turn(ctx, results)
         await ctx.send(message)
         # Check if game is over
         if game.state == Game.OVER:
-            await ctx.send(self.SEPARATOR)
+            await ctx.send(Phrases.SEPARATOR)
             await self.stop(ctx)
 
     @play.group('start', aliases=['new'])
@@ -160,10 +162,10 @@ class Mex(commands.Cog):
         stop_result = await self.stop(ctx)
         # Check if a duel game is pending
         if stop_result == GAME_UNDECIDED:
-            await ctx.send(self.WAIT)
+            await ctx.send(Phrases.WAIT)
         else:
             if stop_result == GAME_STOPPED:
-                await ctx.send(self.SEPARATOR)
+                await ctx.send(Phrases.SEPARATOR)
             await self.reset(ctx, roll_limit)
 
     @play.group('stop', aliases=['finish'])
@@ -178,7 +180,7 @@ class Mex(commands.Cog):
         duel = game.conclude()
         if duel:
             self.games[ctx.channel.id] = duel
-            await ctx.send(choice(self.DUEL).format(list_names(duel.players_allowed)))
+            await ctx.send(choice(Phrases.DUEL).format(list_names(duel.players_allowed)))
             return GAME_UNDECIDED
         else:
             await ctx.send(self.make_message_conclusion(ctx, game))

@@ -13,7 +13,7 @@ from quiz import *
 
 TOKEN_DISCORD_BOT = os.getenv("TOKEN_DISCORD_BOT")
 
-bot = commands.Bot(command_prefix='!')
+bot = commands.Bot(command_prefix='!', help_command=None)
 
 @bot.event
 async def on_ready():
