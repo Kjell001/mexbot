@@ -8,7 +8,9 @@ DICE_MEX = Roll(VALUES_MEX)
 LIMIT_MIN = 1
 LIMIT_MAX = 3
 STREAK = 3
+
 PLAYER_ALREADY_ROLLED = 1
+ALL_PLAYERS = 'all'
 
 
 class Charms(object):
@@ -24,6 +26,7 @@ class Results(object):
         self.game = game
         self.player = player
         self.holdit = False
+        self.house = 0
 
     def add_roll(self, roll):
         self.rolls.append(roll)
@@ -63,6 +66,8 @@ class Results(object):
                     streak = 1
             if streak == STREAK:
                 charm.append(Charms.HOUSE)
+                self.house += 1
+                streak = 0
             charms.append(charm)
             last_roll = roll
         return self.rolls, labels, charms
@@ -73,9 +78,16 @@ class Game(object):
         self.limit = min(max(LIMIT_MIN, roll_limit), LIMIT_MAX)
         self.limit_init = self.limit
         self.players = list()
+        self.tokens = {ALL_PLAYERS: 0}
         self.roll_low = None
         self.players_low = []
         self.mex = 0
+
+    def add_tokens(self, player, amount):
+        if player in self.tokens:
+            self.tokens[player] += amount
+        else:
+            self.tokens[player] = amount
 
     def turn(self, player):
         # Check if player can throw
@@ -123,4 +135,16 @@ class Game(object):
         elif not self.roll_low or roll_last <= self.roll_low:
             self.players_low = [player]
             self.roll_low = roll_last.snapshot()
+        self.add_tokens(ALL_PLAYERS, results.house)
         return results
+
+    def conclude(self):
+        tokens_all = self.tokens[ALL_PLAYERS]
+        if tokens_all > 0:
+            [self.add_tokens(player, tokens_all) for player in self.players]
+        if len(self.players_low) == 1:
+            self.add_tokens(self.players_low, self.mex)
+            return self.tokens
+        else:
+            ## Handle ties
+            pass

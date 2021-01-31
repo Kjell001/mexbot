@@ -123,3 +123,12 @@ class Mex(commands.Cog):
         author_mention = ctx.message.author.mention
         await ctx.send(f'**{author_mention} zet op**')
         await self.play(ctx)
+
+    @play.group('stop', aliases=['klaar'])
+    async def stop(self, ctx):
+        game = self.games.pop(ctx.channel.id, None)
+        if not game:
+            return
+        tokens = game.conclude()
+        ## Print game conclusion
+        ## Handle ties
