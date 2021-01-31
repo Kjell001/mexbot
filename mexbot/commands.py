@@ -10,6 +10,10 @@ from discord.ext import commands
 # Mex game
 from mex import *
 
+GAME_STOPPED = 1
+GAME_UNDECIDED = 2
+GAME_NOT_FOUND = 3
+
 
 class Mex(commands.Cog):
     # Constants
@@ -25,20 +29,23 @@ class Mex(commands.Cog):
         '{} likt aan de dobbelstenen',
         '{} gooit de dobbels bijna van tafel',
         '{} probeert een trick shot',
-        'Geloof in het hart van de dobbelstenen {}!'
+        'Geloof in het hart van de dobbelstenen {}!',
     )
     CHEAT = (
         '{} CHEATOR COMPLETOR!',
         '{} eist een hertelling, maar de uitslag is hetzelfde',
         '{}, je bent al aan de beurt geweest valsspelert!',
-        'Volgende potje mag je weer {}'
+        'Volgende potje mag je weer {}',
     )
     DUEL = (
         '{} duelleren tot de dood!',
         '{} vechten het onderling uit',
         '{} moeten nog even door',
-        '{}, er kan er maar één de laagste zijn!'
+        '{}, er kan er maar één de laagste zijn!',
     )
+    ALONE = 'Wie alleen speelt, verliest altijd...'
+    WAIT = 'Er kan nog geen nieuwe game opgezet worden'
+    SEPARATOR = '-  -  -  -  -  -  -  -  -  -'
     CHARM = {
         Charms.MEX: '` Mex! `',
         Charms.GIVE: '` Uitdelen! `',
@@ -96,6 +103,8 @@ class Mex(commands.Cog):
 
     def make_message_conclusion(self, game):
         message = 'Game over!'
+        if len(game.players) == 1:
+            message += ' ' + self.ALONE
         tokens_sorted = sorted(game.tokens.items(), key=lambda x: x[1], reverse=True)
         for player, tokens in tokens_sorted:
             message += (f'\n` 🍺 x{tokens} `  {player}')
@@ -131,24 +140,42 @@ class Mex(commands.Cog):
         await ctx.send(message)
         # Check if game is over
         if game.state == Game.OVER:
-            await ctx.send('-  -  -  -  -  -  -  -  -  -')
+            await ctx.send(self.SEPARATOR)
             await self.stop(ctx)
 
     @play.group('start', aliases=['new'])
     async def start(self, ctx, roll_limit = ROLL_LIMIT_DEFAULT):
-        game = Game(roll_limit)
-        self.games[ctx.channel.id] = game
-        await self.play(ctx)
+        # Finish running game
+        stop_result = await self.stop(ctx)
+        # Check if a duel game is pending
+        if stop_result == GAME_UNDECIDED:
+            await ctx.send(self.WAIT)
+        else:
+            if stop_result == GAME_STOPPED:
+                await ctx.send(self.SEPARATOR)
+            await self.reset(ctx, roll_limit)
 
-    @play.group('stop', aliases=['klaar'])
+    @play.group('stop', aliases=['finish'])
     async def stop(self, ctx):
-        game = self.games.pop(ctx.channel.id, None)
+        # Get current game
+        game = self.games.get(ctx.channel.id)
         if not game:
-            return
+            return GAME_NOT_FOUND
+        elif game.state == Game.UNDECIDED:
+            return GAME_UNDECIDED
+        # Stop current game or start a duel
         duel = game.conclude()
         if duel:
             self.games[ctx.channel.id] = duel
-            message = choice(self.DUEL).format(list_names(duel.players_allowed))
+            await ctx.send(choice(self.DUEL).format(list_names(duel.players_allowed)))
+            return GAME_UNDECIDED
         else:
-            message = self.make_message_conclusion(game)
-        await ctx.send(message)
+            await ctx.send(self.make_message_conclusion(game))
+            self.games.pop(ctx.channel.id)
+            return GAME_STOPPED
+
+    @play.group('reset')
+    async def reset(self, ctx, roll_limit = ROLL_LIMIT_DEFAULT):
+        game = Game(roll_limit)
+        self.games[ctx.channel.id] = game
+        await self.play(ctx)

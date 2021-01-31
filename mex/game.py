@@ -80,8 +80,9 @@ class Results(object):
 class Game(object):
     INITIATED = 0
     ONGOING = 1
-    OVER = 2
-    CONCLUDED = 3
+    UNDECIDED = 2
+    OVER = 3
+    CONCLUDED = 4
 
     def __init__(self, roll_limit=3, players_allowed=None, mex=0, tokens=None):
         self.limit = min(max(LIMIT_MIN, roll_limit), LIMIT_MAX)
@@ -92,7 +93,7 @@ class Game(object):
         self.roll_low = None
         self.players_low = []
         self.mex = mex
-        self.state = Game.INITIATED
+        self.state = Game.UNDECIDED if players_allowed else Game.INITIATED
 
     def add_tokens(self, player, amount):
         if player in self.tokens:
@@ -107,7 +108,7 @@ class Game(object):
         if self.players_allowed and player not in self.players_allowed:
             return PLAYER_NOT_ALLOWED
         self.players.append(player)
-        self.state = Game.ONGOING
+        self.state = Game.UNDECIDED if self.players_allowed else Game.ONGOING
         # Setup
         results = Results(self, player)
         roll = Roll()
