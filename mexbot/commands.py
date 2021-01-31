@@ -54,6 +54,7 @@ class Mex(commands.Cog):
     }
     # States
     games = dict()
+    games_count = dict()
     # Helpers
     get_member = commands.MemberConverter()
 
@@ -70,11 +71,20 @@ class Mex(commands.Cog):
             fresh1, fresh2 = True, True
         return self.dice_icon(value1, not fresh1) + sep + self.dice_icon(value2, not fresh2)
 
-    def make_message_turn(self, results):
+    def add_game_count(self, guild_id):
+        if guild_id in self.games_count:
+            self.games_count[guild_id] += 1
+        else:
+            self.games_count[guild_id] = 1
+
+    def make_message_turn(self, ctx, results):
         game = results.game
         player = results.player
         # Announce
         line_user = choice(self.START).format(player)
+        if len(game.players) == 1:
+            game_num = self.games_count[ctx.guild.id]
+            line_user = f'**Game #{game_num:03d}** ' + line_user
         # Display rolls
         lines_roll = list()
         rolls, labels, charms = results.get()
@@ -101,8 +111,9 @@ class Mex(commands.Cog):
         # Put message together
         return line_user + '\n\n' + '\n\n'.join(lines_roll) + '\n\n' + line_game
 
-    def make_message_conclusion(self, game):
-        message = 'Game over!'
+    def make_message_conclusion(self, ctx, game):
+        game_num = self.games_count[ctx.guild.id]
+        message = f'**Game #{game_num:03d} over!**'
         if len(game.players) == 1:
             message += ' ' + self.ALONE
         tokens_sorted = sorted(game.tokens.items(), key=lambda x: x[1], reverse=True)
@@ -121,7 +132,7 @@ class Mex(commands.Cog):
         # Check for a game
         game = self.games.get(ctx.channel.id)
         if not game:
-            await self.start(ctx)
+            await self.reset(ctx)
             return
         # Check if a proxy user was specified by owner
         if proxy_user and (await self.bot.is_owner(ctx.message.author)):
@@ -136,7 +147,7 @@ class Mex(commands.Cog):
         if results == PLAYER_ALREADY_ROLLED:
             message = choice(self.CHEAT).format(player_mention)
         else:
-            message = self.make_message_turn(results)
+            message = self.make_message_turn(ctx, results)
         await ctx.send(message)
         # Check if game is over
         if game.state == Game.OVER:
@@ -170,12 +181,12 @@ class Mex(commands.Cog):
             await ctx.send(choice(self.DUEL).format(list_names(duel.players_allowed)))
             return GAME_UNDECIDED
         else:
-            await ctx.send(self.make_message_conclusion(game))
+            await ctx.send(self.make_message_conclusion(ctx, game))
             self.games.pop(ctx.channel.id)
             return GAME_STOPPED
 
     @play.group('reset')
     async def reset(self, ctx, roll_limit = ROLL_LIMIT_DEFAULT):
-        game = Game(roll_limit)
-        self.games[ctx.channel.id] = game
+        self.games[ctx.channel.id] = Game(roll_limit)
+        self.add_game_count(ctx.guild.id)
         await self.play(ctx)
