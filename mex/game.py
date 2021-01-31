@@ -143,8 +143,8 @@ class Game(object):
         if tokens_all > 0:
             [self.add_tokens(player, tokens_all) for player in self.players]
         if len(self.players_low) == 1:
-            self.add_tokens(self.players_low, self.mex)
-            return self.tokens
+            self.add_tokens(self.players_low[0], self.mex + 1)
+            self.tokens.pop(ALL_PLAYERS)
         else:
             ## Handle ties
             pass

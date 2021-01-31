@@ -56,7 +56,7 @@ class Mex(commands.Cog):
             fresh1, fresh2 = True, True
         return self.dice_icon(value1, not fresh1) + sep + self.dice_icon(value2, not fresh2)
 
-    def make_message(self, results):
+    def make_message_turn(self, results):
         game = results.game
         player = results.player
         # Announce
@@ -87,6 +87,13 @@ class Mex(commands.Cog):
         # Put message together
         return line_user + '\n\n' + '\n\n'.join(lines_roll) + '\n\n' + line_game
 
+    def make_message_conclusion(self, game):
+        message = 'Game over!'
+        tokens_sorted = sorted(game.tokens.items(), key=lambda x: x[1], reverse=True)
+        for player, tokens in tokens_sorted:
+            message += (f'\n` 🍺 x{tokens} `  {player}')
+        return message
+
     @commands.Cog.listener()
     async def on_ready(self):
         print('Mex: loaded commands')
@@ -113,7 +120,7 @@ class Mex(commands.Cog):
         if results == PLAYER_ALREADY_ROLLED:
             message = choice(self.CHEAT).format(player_mention)
         else:
-            message = self.make_message(results)
+            message = self.make_message_turn(results)
         await ctx.send(message)
 
     @play.group('start', aliases=['new'])
@@ -131,4 +138,5 @@ class Mex(commands.Cog):
             return
         tokens = game.conclude()
         ## Print game conclusion
+        await ctx.send(self.make_message_conclusion(game))
         ## Handle ties
