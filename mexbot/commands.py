@@ -33,6 +33,12 @@ class Mex(commands.Cog):
         '{}, je bent al aan de beurt geweest valsspelert!',
         'Volgende potje mag je weer {}'
     )
+    DUEL = (
+        '{} duelleren tot de dood!',
+        '{} vechten het onderling uit',
+        '{} moeten nog even door',
+        '{}, er kan er maar één de laagste zijn!'
+    )
     CHARM = {
         Charms.MEX: '` Mex! `',
         Charms.GIVE: '` Uitdelen! `',
@@ -142,7 +148,7 @@ class Mex(commands.Cog):
         duel = game.conclude()
         if duel:
             self.games[ctx.channel.id] = duel
-            message = f'{list_names(duel.players_allowed)} duelleren tot de dood!'
+            message = choice(self.DUEL).format(list_names(duel.players_allowed))
         else:
             message = self.make_message_conclusion(game)
         await ctx.send(message)
