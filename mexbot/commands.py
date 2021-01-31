@@ -24,7 +24,8 @@ class Mex(commands.Cog):
         '{} heeft nog geen dorst',
         '{} likt aan de dobbelstenen',
         '{} gooit de dobbels bijna van tafel',
-        '{} probeert een trick shot'
+        '{} probeert een trick shot',
+        'Geloof in het hart van de dobbelstenen {}!'
     )
     CHEAT = (
         '{} CHEATOR COMPLETOR!',
@@ -122,13 +123,15 @@ class Mex(commands.Cog):
         else:
             message = self.make_message_turn(results)
         await ctx.send(message)
+        # Check if game is over
+        if game.state == Game.OVER:
+            await ctx.send('-  -  -  -  -  -  -  -  -  -')
+            await self.stop(ctx)
 
     @play.group('start', aliases=['new'])
     async def start(self, ctx, roll_limit = ROLL_LIMIT_DEFAULT):
         game = Game(roll_limit)
         self.games[ctx.channel.id] = game
-        author_mention = ctx.message.author.mention
-        await ctx.send(f'**{author_mention} zet op**')
         await self.play(ctx)
 
     @play.group('stop', aliases=['klaar'])
@@ -136,7 +139,10 @@ class Mex(commands.Cog):
         game = self.games.pop(ctx.channel.id, None)
         if not game:
             return
-        tokens = game.conclude()
-        ## Print game conclusion
-        await ctx.send(self.make_message_conclusion(game))
-        ## Handle ties
+        duel = game.conclude()
+        if duel:
+            self.games[ctx.channel.id] = duel
+            message = f'{list_names(duel.players_allowed)} duelleren tot de dood!'
+        else:
+            message = self.make_message_conclusion(game)
+        await ctx.send(message)
