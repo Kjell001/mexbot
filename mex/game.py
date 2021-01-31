@@ -92,11 +92,7 @@ class Game(object):
             value1, fresh1 = roll.first()
             value2, fresh2 = roll.second()
             # Identify special situations
-            if self.roll_low and roll == self.roll_low and roll_num < self.limit:
-                # Check if this identical to lowest pair in game
-                results.interrupt()
-                break
-            elif roll == DICE_GIVE:
+            if roll == DICE_GIVE:
                 # Give, extra round
                 roll.reroll()
                 continue
@@ -105,6 +101,10 @@ class Game(object):
                 if len(self.players) == 1:
                     self.limit = roll_num
                 self.mex += 1
+                break
+            elif self.roll_low and roll == self.roll_low and roll_num < self.limit:
+                # Check if this identical to lowest pair in game
+                results.interrupt()
                 break
             elif value1 in DICE_KEEP and fresh1:
                 # Keep first dice
