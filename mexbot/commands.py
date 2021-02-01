@@ -14,6 +14,9 @@ GAME_STOPPED = 1
 GAME_UNDECIDED = 2
 GAME_NOT_FOUND = 3
 
+HOME_GUILD_ID = 800402178673213450
+DICE_STYLES = ('1929', 'casino')
+
 
 class Phrases(object):
     START = (
@@ -51,48 +54,62 @@ class Phrases(object):
     }
 
 
+class GuildSettings(object):
+    def __init__(self):
+        self.game_count = 0
+        self.dice_style = DICE_STYLES[1]
+
+    def add_game_count(self):
+        self.game_count += 1
+        return self.game_count
+
+    def set_dice_style(self, dice_style):
+        if dice_style in DICE_STYLES:
+            self.dice_style = dice_style
+
+
 class Mex(commands.Cog):
     # Constants
     ROLL_LIMIT_DEFAULT = 3
     # States
     games = dict()
     games_count = dict()
+    guild_settings = dict()
     # Helpers
     get_member = commands.MemberConverter()
 
     def __init__(self, bot):
         self.bot = bot
 
-    def dice_icon(self, value, dark=False):
-        return self.emojis['dice{}{}'.format(str(value), 'd' if dark else '')]
+    def dice_icon(self, value, dark, style):
+        key = 'd{}{}_{}'.format(str(value), 'd' if dark else '', style)
+        return self.emojis[key]
 
-    def roll_icons(self, roll, shade=True, sep=' '):
+    def roll_icons(self, roll, shade, style):
         value1, fresh1 = roll.first()
         value2, fresh2 = roll.second()
         if not shade:
             fresh1, fresh2 = True, True
-        return self.dice_icon(value1, not fresh1) + sep + self.dice_icon(value2, not fresh2)
-
-    def add_game_count(self, guild_id):
-        if guild_id in self.games_count:
-            self.games_count[guild_id] += 1
-        else:
-            self.games_count[guild_id] = 1
+        return ' '.join([
+            self.dice_icon(value1, not fresh1, style),
+            self.dice_icon(value2, not fresh2, style)
+        ])
 
     def make_message_turn(self, ctx, results):
         game = results.game
         player = results.player
+        dice_style = self.guild_settings[ctx.guild.id].dice_style
         # Announce
         line_user = choice(Phrases.START).format(player)
         if len(game.players) == 1:
-            game_num = self.games_count[ctx.guild.id]
+            game_num = self.guild_settings[ctx.guild.id].game_count
             line_user = f'**Game #{game_num:03d}** ' + line_user
         # Display rolls
         lines_roll = list()
         rolls, labels, charms = results.get()
         for i in range(len(rolls)):
             str_label = f'` {labels[i]} `'
-            str_roll = self.roll_icons(rolls[i])
+            str_roll = self.roll_icons(rolls[i], True, dice_style)
             str_charms = '  '.join(Phrases.CHARM[c] for c in charms[i])
             lines_roll.append('{}  {}{}{}'.format(
                 str_label,
@@ -104,7 +121,7 @@ class Mex(commands.Cog):
         line_game = '{} {} laag met {}'.format(
             list_names(game.players_low),
             'zijn' if len(game.players_low) > 1 else 'is',
-            self.roll_icons(game.roll_low, False)
+            self.roll_icons(game.roll_low, False, dice_style)
         )
         if game.limit < game.limit_init:
             line_game = f'Mex in {game.limit}  ◇  ' + line_game
@@ -114,7 +131,7 @@ class Mex(commands.Cog):
         return line_user + '\n\n' + '\n\n'.join(lines_roll) + '\n\n' + line_game
 
     def make_message_conclusion(self, ctx, game):
-        game_num = self.games_count[ctx.guild.id]
+        game_num = self.guild_settings[ctx.guild.id].game_count
         message = f'**Game #{game_num:03d} over!**'
         if len(game.players) == 1:
             message += ' ' + Phrases.ALONE
@@ -126,7 +143,8 @@ class Mex(commands.Cog):
     @commands.Cog.listener()
     async def on_ready(self):
         print('Mex: loaded commands')
-        self.emojis = dict((e.name, f'<:{e.name}:{str(e.id)}>') for e in self.bot.emojis)
+        home_guild_emojis = self.bot.get_guild(HOME_GUILD_ID).emojis
+        self.emojis = dict((e.name, str(e)) for e in home_guild_emojis)
         print('Mex: loaded emojis')
 
     @commands.group('mex', invoke_without_command=True)
@@ -147,10 +165,11 @@ class Mex(commands.Cog):
         results = game.turn(player_mention)
         # Construct and post message
         if results == PLAYER_ALREADY_ROLLED:
-            message = choice(Phrases.CHEAT).format(player_mention)
+            await ctx.send(choice(Phrases.CHEAT).format(player_mention))
+        elif results == PLAYER_NOT_ALLOWED:
+            pass ## Give reaction
         else:
-            message = self.make_message_turn(ctx, results)
-        await ctx.send(message)
+            await ctx.send(self.make_message_turn(ctx, results))
         # Check if game is over
         if game.state == Game.OVER:
             await ctx.send(Phrases.SEPARATOR)
@@ -189,6 +208,17 @@ class Mex(commands.Cog):
 
     @play.group('reset')
     async def reset(self, ctx, roll_limit = ROLL_LIMIT_DEFAULT):
+        # Set up game
         self.games[ctx.channel.id] = Game(roll_limit)
-        self.add_game_count(ctx.guild.id)
+        # Update guild game count
+        guild_id = ctx.guild.id
+        if guild_id not in self.guild_settings:
+            self.guild_settings[guild_id] = GuildSettings()
+        self.guild_settings[guild_id].add_game_count()
+        # Play turn
         await self.play(ctx)
+
+    @play.command('style')
+    async def set_dice_style(self, ctx, dice_style=DICE_STYLES[0]):
+        self.guild_settings[ctx.guild.id].set_dice_style(dice_style)
+
