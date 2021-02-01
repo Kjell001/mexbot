@@ -57,7 +57,7 @@ class Phrases(object):
 class GuildSettings(object):
     def __init__(self):
         self.game_count = 0
-        self.dice_style = DICE_STYLES[1]
+        self.dice_style = DICE_STYLES[0]
 
     def add_game_count(self):
         self.game_count += 1
@@ -219,6 +219,5 @@ class Mex(commands.Cog):
         await self.play(ctx)
 
     @play.command('style')
-    async def set_dice_style(self, ctx, dice_style=DICE_STYLES[0]):
+    async def set_dice_style(self, ctx, dice_style=None):
         self.guild_settings[ctx.guild.id].set_dice_style(dice_style)
-
