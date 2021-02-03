@@ -9,6 +9,7 @@ VALUES_GIVE = [1, 3]
 VALUES_MEX = [1, 2]
 HUGE = float('inf')
 
+
 class Roll(object):
     def __init__(self, values=None):
         self.fresh = [True, True]

@@ -11,12 +11,12 @@ from discord.ext import commands
 # Mex game
 from mex import *
 
-GAME_STOPPED = 1
-GAME_UNDECIDED = 2
-GAME_NOT_FOUND = 3
+# GAME_STOPPED = 1
+# GAME_UNDECIDED = 2
+# GAME_NOT_FOUND = 3
 
 HOME_GUILD_ID = 800402178673213450
-DICE_STYLES = ('1929', 'casino')
+# DICE_STYLES = ('1929', 'casino')
 
 
 class Phrases(object):
@@ -45,7 +45,9 @@ class Phrases(object):
         '{}, er kan er maar één de laagste zijn!',
     )
     ALONE = 'Wie alleen speelt, verliest altijd...'
-    WAIT = 'Er kan nog geen nieuwe game opgezet worden'
+    START_WAIT = 'Er kan nog geen nieuwe game opgezet worden',
+    STOP_WAIT = 'Het duel is nog niet voorbij',
+    NOT_DUELIST = 'Dit is niet jouw duel!',
     SEPARATOR = '-  -  -  -  -  -  -  -  -  -'
     CHARM = {
         Charms.MEX: '` Mex! `',
@@ -55,18 +57,18 @@ class Phrases(object):
     }
 
 
-class GuildSettings(object):
-    def __init__(self):
-        self.game_count = 0
-        self.dice_style = DICE_STYLES[0]
-
-    def add_game_count(self):
-        self.game_count += 1
-        return self.game_count
-
-    def set_dice_style(self, dice_style):
-        if dice_style in DICE_STYLES:
-            self.dice_style = dice_style
+# class GuildSettings(object):
+#     def __init__(self):
+#         self.game_count = 0
+#         self.dice_style = DICE_STYLES[0]
+#
+#     def add_game_count(self):
+#         self.game_count += 1
+#         return self.game_count
+#
+#     def set_dice_style(self, dice_style):
+#         if dice_style in DICE_STYLES:
+#             self.dice_style = dice_style
 
 
 class Mex(commands.Cog):
@@ -81,6 +83,17 @@ class Mex(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
+        self.channel_controllers = dict()
+        self.emojis = None
+
+    def add_channel_controller(self, channel):
+        self.channel_controllers[channel.id] = ChannelController()
+
+    def get_channel_controller(self, ctx):
+        if ctx.channel.id not in self.channel_controllers:
+            self.channel_controllers[ctx.channel.id] = ChannelController()
+            print(f'Created controller for #{ctx.channel} in {ctx.guild}')
+        return self.channel_controllers[ctx.channel.id]
 
     # def dice_icon(self, value, dark, style):
     #     key = 'd{}{}_{}'.format(str(value), 'd' if dark else '', style)
@@ -97,20 +110,20 @@ class Mex(commands.Cog):
     #     ])
 
     def make_message_turn(self, ctx, results):
-        game = results.game
+        channel_controller = self.get_channel_controller(ctx)
+        game = channel_controller.game
+        game_count = channel_controller.game_count
         player = results.player
-        dice_style = self.guild_settings[ctx.guild.id].dice_style
         # Announce
         line_user = choice(Phrases.START).format(player)
         if len(game.players) == 1:
-            game_num = self.guild_settings[ctx.guild.id].game_count
-            line_user = f'**Game #{game_num:03d}** ' + line_user
+            line_user = f'**Game #{game_count:03d}** ' + line_user
         # Display rolls
         lines_roll = list()
         rolls, labels, charms = results.get()
         for i in range(len(rolls)):
             str_label = f'` {labels[i]} `'
-            str_roll = self.roll_icons(rolls[i], True, dice_style)
+            str_roll = channel_controller.get_roll_string(self.emojis, rolls[i], True)
             str_charms = '  '.join(Phrases.CHARM[c] for c in charms[i])
             lines_roll.append('{}  {}{}{}'.format(
                 str_label,
@@ -122,7 +135,7 @@ class Mex(commands.Cog):
         line_game = '{} {} laag met {}'.format(
             list_names(game.players_low),
             'zijn' if len(game.players_low) > 1 else 'is',
-            self.roll_icons(game.roll_low, False, dice_style)
+            channel_controller.get_roll_string(self.emojis, game.roll_low, False)
         )
         if game.limit < game.limit_init:
             line_game = f'Mex in {game.limit}  ◇  ' + line_game
@@ -131,14 +144,15 @@ class Mex(commands.Cog):
         # Put message together
         return line_user + '\n\n' + '\n\n'.join(lines_roll) + '\n\n' + line_game
 
-    def make_message_conclusion(self, ctx, game):
-        game_num = self.guild_settings[ctx.guild.id].game_count
-        message = f'**Game #{game_num:03d} over!**'
+    def make_message_conclusion(self, ctx):
+        channel_controller = self.get_channel_controller(ctx)
+        game = channel_controller.game
+        game_count = channel_controller.game_count
+        message = f'**Game #{game_count:03d} over!**'
         if len(game.players) == 1:
             message += ' ' + Phrases.ALONE
-        tokens_sorted = sorted(game.tokens.items(), key=lambda x: x[1], reverse=True)
-        for player, tokens in tokens_sorted:
-            message += (f'\n` 🍺 x{tokens} `  {player}')
+        for player, tokens in game.get_tokens():
+            message += f'\n` 🍺 x{tokens} `  {player}'
         return message
 
     @commands.Cog.listener()
@@ -150,75 +164,112 @@ class Mex(commands.Cog):
 
     @commands.group('mex', invoke_without_command=True)
     async def play(self, ctx, proxy_user=None):
-        # Check for a game
-        game = self.games.get(ctx.channel.id)
-        if not game:
-            await self.reset(ctx)
-            return
-        # Check if a proxy user was specified by owner
+        channel_controller = self.get_channel_controller(ctx)
         if proxy_user and (await self.bot.is_owner(ctx.message.author)):
+            # Check if a proxy user was specified by owner
             try:
                 proxy_user = await self.get_member.convert(ctx, proxy_user)
             except commands.MemberNotFound:
                 proxy_user = None
-        # Play a turn
-        player_mention = proxy_user.mention if proxy_user else ctx.message.author.mention
-        results = game.turn(player_mention)
-        # Construct and post message
-        if results == PLAYER_ALREADY_ROLLED:
-            await ctx.send(choice(Phrases.CHEAT).format(player_mention))
-        elif results == PLAYER_NOT_ALLOWED:
-            pass ## Give reaction
-        else:
-            await ctx.send(self.make_message_turn(ctx, results))
-        # Check if game is over
-        if game.state == GAME_OVER:
+        player = proxy_user.mention if proxy_user else ctx.message.author.mention
+        flag, results = channel_controller.take_turn(player)
+        if flag == TURN_ALREADY_ROLLED:
+            await ctx.send(choice(Phrases.CHEAT).format(player))
+        elif flag == TURN_NOT_ALLOWED:
+            await ctx.send(choice(Phrases.NOT_DUELIST).format(player))
+        elif flag == TURN_TAKEN_GAME_OVER:
             await ctx.send(Phrases.SEPARATOR)
             await self.stop(ctx)
 
+        ###################################
+        # # Check for a game
+        # game = self.games.get(ctx.channel.id)
+        # if not game:
+        #     await self.reset(ctx)
+        #     return
+        # # Check if a proxy user was specified by owner
+        # if proxy_user and (await self.bot.is_owner(ctx.message.author)):
+        #     try:
+        #         proxy_user = await self.get_member.convert(ctx, proxy_user)
+        #     except commands.MemberNotFound:
+        #         proxy_user = None
+        # # Play a turn
+        # player_mention = proxy_user.mention if proxy_user else ctx.message.author.mention
+        # results = game.turn(player_mention)
+        # # Construct and post message
+        # if results == PLAYER_ALREADY_ROLLED:
+        #     await ctx.send(choice(Phrases.CHEAT).format(player_mention))
+        # elif results == PLAYER_NOT_ALLOWED:
+        #     pass ## Give reaction
+        # else:
+        #     await ctx.send(self.make_message_turn(ctx, results))
+        # # Check if game is over
+        # if game.state == GAME_OVER:
+        #     await ctx.send(Phrases.SEPARATOR)
+        #     await self.stop(ctx)
+
+    @play.group('reset')
+    async def reset(self, ctx, roll_limit=None):
+        channel_controller = self.get_channel_controller(ctx)
+        channel_controller.new_game(roll_limit)
+        await self.play(ctx)
+
     @play.group('start', aliases=['new'])
-    async def start(self, ctx, roll_limit = ROLL_LIMIT_DEFAULT):
-        # Finish running game
-        stop_result = await self.stop(ctx)
-        # Check if a duel game is pending
-        if stop_result == GAME_UNDECIDED:
-            await ctx.send(Phrases.WAIT)
-        else:
-            if stop_result == GAME_STOPPED:
-                await ctx.send(Phrases.SEPARATOR)
-            await self.reset(ctx, roll_limit)
+    async def start(self, ctx, roll_limit=None):
+        flag = await self.stop(ctx)
+        if flag == STOP_GAME_UNDECIDED:
+            return
+        elif flag == STOP_GAME_DUEL:
+            await ctx.send(Phrases.START_WAIT)
+            return
+        elif flag == STOP_GAME_OVER:
+            await ctx.send(Phrases.SEPARATOR)
+        await self.reset(ctx, roll_limit)
+
+        ###################################
+        # # Finish running game
+        # stop_result = await self.stop(ctx)
+        # # Check if a duel game is pending
+        # if stop_result == GAME_UNDECIDED:
+        #     await ctx.send(Phrases.START_WAIT)
+        # else:
+        #     if stop_result == GAME_STOPPED:
+        #         await ctx.send(Phrases.SEPARATOR)
+        #     await self.reset(ctx, roll_limit)
 
     @play.group('stop', aliases=['finish'])
     async def stop(self, ctx):
-        # Get current game
-        game = self.games.get(ctx.channel.id)
-        if not game:
-            return GAME_NOT_FOUND
-        elif game.state == GAME_UNDECIDED:
-            return GAME_UNDECIDED
-        # Stop current game or start a duel
-        duel = game.conclude()
-        if duel:
-            self.games[ctx.channel.id] = duel
-            await ctx.send(choice(Phrases.DUEL).format(list_names(duel.players_allowed)))
-            return GAME_UNDECIDED
-        else:
-            await ctx.send(self.make_message_conclusion(ctx, game))
-            self.games.pop(ctx.channel.id)
-            return GAME_STOPPED
+        channel_controller = self.get_channel_controller(ctx)
+        flag = channel_controller.stop_game()
+        game = channel_controller.game
+        if flag == STOP_GAME_UNDECIDED:
+            await ctx.send(Phrases.STOP_WAIT)
+        elif flag == STOP_GAME_DUEL:
+            await ctx.send(choice(Phrases.DUEL).format(list_names(game.players_allowed)))
+        elif flag == STOP_GAME_OVER:
+            await ctx.send(self.make_message_conclusion(ctx))
+        return flag
 
-    @play.group('reset')
-    async def reset(self, ctx, roll_limit = ROLL_LIMIT_DEFAULT):
-        # Set up game
-        self.games[ctx.channel.id] = Game(roll_limit)
-        # Update guild game count
-        guild_id = ctx.guild.id
-        if guild_id not in self.guild_settings:
-            self.guild_settings[guild_id] = GuildSettings()
-        self.guild_settings[guild_id].add_game_count()
-        # Play turn
-        await self.play(ctx)
+        ###################################
+        # game = channel_controller.game
+        # # Get current game
+        # game = self.games.get(ctx.channel.id)
+        # if not game:
+        #     return GAME_NOT_FOUND
+        # elif game.state == GAME_UNDECIDED:
+        #     return GAME_UNDECIDED
+        # # Stop current game or start a duel
+        # duel = game.conclude()
+        # if duel:
+        #     self.games[ctx.channel.id] = duel
+        #     await ctx.send(choice(Phrases.DUEL).format(list_names(duel.players_allowed)))
+        #     return GAME_UNDECIDED
+        # else:
+        #     await ctx.send(self.make_message_conclusion(ctx, game))
+        #     self.games.pop(ctx.channel.id)
+        #     return GAME_STOPPED
 
     @play.command('style')
     async def set_dice_style(self, ctx, dice_style=None):
-        self.guild_settings[ctx.guild.id].set_dice_style(dice_style)
+        channel_controller = self.get_channel_controller(ctx)
+        channel_controller.set_dice_style(dice_style)

@@ -87,6 +87,13 @@ class Game(object):
     def __init__(self, roll_limit=LIMIT_DEFAULT, players_allowed=None):
         self.tokens = dict()
         self.mex = 0
+        self.limit = None
+        self.limit_init = None
+        self.players_allowed = None
+        self.players = None
+        self.roll_low = None
+        self.players_low = None
+        self.state = None
         self.set_limit(roll_limit)
         self.set_allowed_players(players_allowed)
         self.refresh()
@@ -120,6 +127,9 @@ class Game(object):
     def distribute_loser_tokens(self):
         for player in self.players_low:
             self.add_tokens(player, self.mex + 1)
+
+    def get_tokens(self):
+        return sorted(self.tokens.items(), key=lambda x: x[1], reverse=True)
 
     def turn(self, player):
         # Check if player can throw

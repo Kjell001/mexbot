@@ -35,7 +35,8 @@ class Quiz(commands.Cog):
         answers.append(answer_correct)
         return question, answers
 
-    def make_message(self, question, answers):
+    @staticmethod
+    def make_message(question, answers):
         # Format question and answers
         line_quiz = f'*Secret quiz time: {question}*\n'
         lines_answers = []

@@ -16,6 +16,7 @@ TURN_NOT_ALLOWED = 4
 STOP_GAME_OVER = 5
 STOP_GAME_DUEL = 6
 STOP_GAME_UNDECIDED = 7
+STOP_GAME_UNPLAYED = 8
 
 
 class ChannelController(object):
@@ -27,6 +28,7 @@ class ChannelController(object):
     def new_game(self, roll_limit=None):
         roll_limit = roll_limit or LIMIT_DEFAULT
         self.game = Game(roll_limit)
+        self.game_count += 1
 
     def take_turn(self, player):
         if not self.game:
@@ -47,10 +49,10 @@ class ChannelController(object):
             return NO_GAME_FOUND
         elif self.game.state == GAME_UNDECIDED:
             return STOP_GAME_UNDECIDED
-        else: # GAME_ONGOING or GAME_OVER
+        else:  # GAME_ONGOING or GAME_OVER
             if not self.game.players_low:
                 # No turns taken yet
-                return STOP_GAME_OVER
+                return STOP_GAME_UNPLAYED
             else:
                 self.game.distribute_shared_tokens()
                 if len(self.game.players_low) == 1:
@@ -65,11 +67,11 @@ class ChannelController(object):
                     self.game.refresh()
                     return STOP_GAME_DUEL
 
-    def set_dice_style(self, style):
-        if style not in DICE_STYLES:
+    def set_dice_style(self, dice_style):
+        if dice_style not in DICE_STYLES:
             return False
         else:
-            self.dice_style = style
+            self.dice_style = dice_style
             return True
 
     def get_roll_string(self, emojis, roll, shade):
