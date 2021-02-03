@@ -7,8 +7,14 @@ DICE_GIVE = Roll(VALUES_GIVE)
 DICE_MEX = Roll(VALUES_MEX)
 LIMIT_MIN = 1
 LIMIT_MAX = 3
+LIMIT_DEFAULT = 3
 LIMIT_DUEL = 1
 STREAK = 3
+
+# Game states
+GAME_ONGOING = 1    # Turns taken
+GAME_UNDECIDED = 2  # Turns taken, has 'players_allowed'
+GAME_OVER = 3       # All players in 'players_allowed' have taken turn
 
 # Roll status
 PLAYER_ALREADY_ROLLED = -1
@@ -78,28 +84,42 @@ class Results(object):
 
 
 class Game(object):
-    INITIATED = 0
-    ONGOING = 1
-    UNDECIDED = 2
-    OVER = 3
-    CONCLUDED = 4
+    def __init__(self, roll_limit=LIMIT_DEFAULT, players_allowed=None):
+        self.tokens = dict()
+        self.mex = 0
+        self.set_limit(roll_limit)
+        self.set_allowed_players(players_allowed)
+        self.refresh()
 
-    def __init__(self, roll_limit=3, players_allowed=None, mex=0, tokens=None):
+    def set_limit(self, roll_limit):
         self.limit = min(max(LIMIT_MIN, roll_limit), LIMIT_MAX)
         self.limit_init = self.limit
-        self.players_allowed = players_allowed
+
+    def set_allowed_players(self, players):
+        self.players_allowed = players
+
+    def refresh(self):
         self.players = list()
-        self.tokens = tokens if tokens else {ALL_PLAYERS: 0}
         self.roll_low = None
         self.players_low = []
-        self.mex = mex
-        self.state = Game.UNDECIDED if players_allowed else Game.INITIATED
+        self.tokens[ALL_PLAYERS] = 0
+        self.state = GAME_UNDECIDED if self.players_allowed else GAME_ONGOING
 
     def add_tokens(self, player, amount):
-        if player in self.tokens:
-            self.tokens[player] += amount
-        else:
+        if player not in self.tokens:
             self.tokens[player] = amount
+        else:
+            self.tokens[player] += amount
+
+    def distribute_shared_tokens(self):
+        tokens_all = self.tokens[ALL_PLAYERS]
+        if tokens_all > 0:
+            [self.add_tokens(player, tokens_all) for player in self.players]
+        self.tokens[ALL_PLAYERS] = 0
+
+    def distribute_loser_tokens(self):
+        for player in self.players_low:
+            self.add_tokens(player, self.mex + 1)
 
     def turn(self, player):
         # Check if player can throw
@@ -108,7 +128,6 @@ class Game(object):
         if self.players_allowed and player not in self.players_allowed:
             return PLAYER_NOT_ALLOWED
         self.players.append(player)
-        self.state = Game.UNDECIDED if self.players_allowed else Game.ONGOING
         # Setup
         results = Results(self, player)
         roll = Roll()
@@ -143,26 +162,17 @@ class Game(object):
                 roll.reroll()
             # Increment roll count
             roll_num += 1
-        # Update game state
+        # Determine lowest players
         roll_last = results.roll_last()
         if self.roll_low and roll_last == self.roll_low:
+            # On par with lowest player
             self.players_low.append(player)
         elif not self.roll_low or roll_last <= self.roll_low:
+            # Player set new low
             self.players_low = [player]
             self.roll_low = roll_last.snapshot()
         self.add_tokens(ALL_PLAYERS, len(results.house))
+        # Check if game is over
         if self.players_allowed and len(self.players) == len(self.players_allowed):
-            self.state = Game.OVER
+            self.state = GAME_OVER
         return results
-
-    def conclude(self):
-        tokens_all = self.tokens[ALL_PLAYERS]
-        if tokens_all > 0:
-            [self.add_tokens(player, tokens_all) for player in self.players]
-        self.state = Game.CONCLUDED
-        if len(self.players_low) == 1:
-            self.add_tokens(self.players_low[0], self.mex + 1)
-            self.tokens.pop(ALL_PLAYERS)
-        else:
-            # Return duel game when tied
-            return Game(LIMIT_DUEL, self.players_low, self.mex, self.tokens)

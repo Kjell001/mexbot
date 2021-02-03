@@ -2,6 +2,7 @@
 
 # Basic
 from random import choice
+from .controllers import *
 from .helpers import *
 
 # Discord
@@ -70,30 +71,30 @@ class GuildSettings(object):
 
 class Mex(commands.Cog):
     # Constants
-    ROLL_LIMIT_DEFAULT = 3
+    # ROLL_LIMIT_DEFAULT = 3
     # States
-    games = dict()
-    games_count = dict()
-    guild_settings = dict()
+    # games = dict()
+    # games_count = dict()
+    # guild_settings = dict()
     # Helpers
     get_member = commands.MemberConverter()
 
     def __init__(self, bot):
         self.bot = bot
 
-    def dice_icon(self, value, dark, style):
-        key = 'd{}{}_{}'.format(str(value), 'd' if dark else '', style)
-        return self.emojis[key]
-
-    def roll_icons(self, roll, shade, style):
-        value1, fresh1 = roll.first()
-        value2, fresh2 = roll.second()
-        if not shade:
-            fresh1, fresh2 = True, True
-        return ' '.join([
-            self.dice_icon(value1, not fresh1, style),
-            self.dice_icon(value2, not fresh2, style)
-        ])
+    # def dice_icon(self, value, dark, style):
+    #     key = 'd{}{}_{}'.format(str(value), 'd' if dark else '', style)
+    #     return self.emojis[key]
+    #
+    # def roll_icons(self, roll, shade, style):
+    #     value1, fresh1 = roll.first()
+    #     value2, fresh2 = roll.second()
+    #     if not shade:
+    #         fresh1, fresh2 = True, True
+    #     return ' '.join([
+    #         self.dice_icon(value1, not fresh1, style),
+    #         self.dice_icon(value2, not fresh2, style)
+    #     ])
 
     def make_message_turn(self, ctx, results):
         game = results.game
@@ -171,7 +172,7 @@ class Mex(commands.Cog):
         else:
             await ctx.send(self.make_message_turn(ctx, results))
         # Check if game is over
-        if game.state == Game.OVER:
+        if game.state == GAME_OVER:
             await ctx.send(Phrases.SEPARATOR)
             await self.stop(ctx)
 
@@ -193,7 +194,7 @@ class Mex(commands.Cog):
         game = self.games.get(ctx.channel.id)
         if not game:
             return GAME_NOT_FOUND
-        elif game.state == Game.UNDECIDED:
+        elif game.state == GAME_UNDECIDED:
             return GAME_UNDECIDED
         # Stop current game or start a duel
         duel = game.conclude()
