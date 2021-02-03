@@ -3,10 +3,10 @@
 from random import randint
 from copy import deepcopy
 
-SIDES_DICE = 3
+SIDES_DICE = 6
 VALUES_KEEP = [1, 2]
 VALUES_GIVE = [1, 3]
-VALUES_MEX = [1, 9]
+VALUES_MEX = [1, 2]
 HUGE = float('inf')
 
 
