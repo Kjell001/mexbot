@@ -45,9 +45,9 @@ class Phrases(object):
         '{}, er kan er maar één de laagste zijn!',
     )
     ALONE = 'Wie alleen speelt, verliest altijd...'
-    START_WAIT = 'Er kan nog geen nieuwe game opgezet worden',
-    STOP_WAIT = 'Het duel is nog niet voorbij',
-    NOT_DUELIST = 'Dit is niet jouw duel!',
+    START_WAIT = 'Er kan nog geen nieuwe game opgezet worden'
+    STOP_WAIT = 'Het duel is nog niet voorbij'
+    NOT_DUELIST = 'Dit is niet jouw duel!'
     SEPARATOR = '-  -  -  -  -  -  -  -  -  -'
     CHARM = {
         Charms.MEX: '` Mex! `',
@@ -144,9 +144,8 @@ class Mex(commands.Cog):
         # Put message together
         return line_user + '\n\n' + '\n\n'.join(lines_roll) + '\n\n' + line_game
 
-    def make_message_conclusion(self, ctx):
+    def make_message_conclusion(self, ctx, game):
         channel_controller = self.get_channel_controller(ctx)
-        game = channel_controller.game
         game_count = channel_controller.game_count
         message = f'**Game #{game_count:03d} over!**'
         if len(game.players) == 1:
@@ -176,10 +175,12 @@ class Mex(commands.Cog):
         if flag == TURN_ALREADY_ROLLED:
             await ctx.send(choice(Phrases.CHEAT).format(player))
         elif flag == TURN_NOT_ALLOWED:
-            await ctx.send(choice(Phrases.NOT_DUELIST).format(player))
-        elif flag == TURN_TAKEN_GAME_OVER:
-            await ctx.send(Phrases.SEPARATOR)
-            await self.stop(ctx)
+            await ctx.send(Phrases.NOT_DUELIST)
+        else:
+            await ctx.send(self.make_message_turn(ctx, results))
+            if flag == TURN_TAKEN_GAME_OVER:
+                await ctx.send(Phrases.SEPARATOR)
+                await self.stop(ctx)
 
         ###################################
         # # Check for a game
@@ -240,14 +241,14 @@ class Mex(commands.Cog):
     @play.group('stop', aliases=['finish'])
     async def stop(self, ctx):
         channel_controller = self.get_channel_controller(ctx)
-        flag = channel_controller.stop_game()
         game = channel_controller.game
+        flag = channel_controller.stop_game()
         if flag == STOP_GAME_UNDECIDED:
             await ctx.send(Phrases.STOP_WAIT)
         elif flag == STOP_GAME_DUEL:
             await ctx.send(choice(Phrases.DUEL).format(list_names(game.players_allowed)))
         elif flag == STOP_GAME_OVER:
-            await ctx.send(self.make_message_conclusion(ctx))
+            await ctx.send(self.make_message_conclusion(ctx, game))
         return flag
 
         ###################################

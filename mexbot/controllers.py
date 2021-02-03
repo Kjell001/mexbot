@@ -58,6 +58,7 @@ class ChannelController(object):
                 if len(self.game.players_low) == 1:
                     # Wrap up game
                     self.game.distribute_loser_tokens()
+                    self.game = None
                     return STOP_GAME_OVER
                 else:
                     # Set up duel

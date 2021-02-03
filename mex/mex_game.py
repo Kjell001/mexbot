@@ -129,7 +129,8 @@ class Game(object):
             self.add_tokens(player, self.mex + 1)
 
     def get_tokens(self):
-        return sorted(self.tokens.items(), key=lambda x: x[1], reverse=True)
+        tokens_sorted = sorted(self.tokens.items(), key=lambda x: x[1], reverse=True)
+        return list(filter(lambda x: x[0] != ALL_PLAYERS, tokens_sorted))
 
     def turn(self, player):
         # Check if player can throw
