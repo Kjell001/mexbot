@@ -91,6 +91,7 @@ class Game(object):
         self.limit_init = None
         self.players_allowed = None
         self.players = None
+        self.giveaways = None
         self.roll_low = None
         self.players_low = None
         self.state = None
@@ -107,6 +108,7 @@ class Game(object):
 
     def refresh(self):
         self.players = list()
+        self.giveaways = list()
         self.roll_low = None
         self.players_low = []
         self.tokens[ALL_PLAYERS] = 0
@@ -117,6 +119,13 @@ class Game(object):
             self.tokens[player] = amount
         else:
             self.tokens[player] += amount
+
+    def spend_giveaway(self, player, target):
+        if player not in self.giveaways:
+            return False
+        self.giveaways.remove(player)
+        self.add_tokens(target, 1)
+        return True
 
     def distribute_shared_tokens(self):
         tokens_all = self.tokens[ALL_PLAYERS]
@@ -150,6 +159,7 @@ class Game(object):
             value2, fresh2 = roll.second()
             # Identify special situations
             if roll == DICE_GIVE:
+                self.giveaways.append(player)
                 # Give, extra round
                 roll.reroll()
                 continue

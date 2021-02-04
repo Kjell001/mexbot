@@ -8,8 +8,8 @@ DICE_STYLES = ('1929', 'casino')
 
 NO_GAME_FOUND = 0
 
-TURN_TAKEN = 1
-TURN_TAKEN_GAME_OVER = 2
+TURN_SUCCES = 1
+TURN_SUCCES_GAME_OVER = 2
 TURN_ALREADY_ROLLED = 3
 TURN_NOT_ALLOWED = 4
 
@@ -17,6 +17,10 @@ STOP_GAME_OVER = 5
 STOP_GAME_DUEL = 6
 STOP_GAME_UNDECIDED = 7
 STOP_GAME_UNPLAYED = 8
+
+GIVE_NO_GAME = 9
+GIVE_NOT_ALLOWED = 10
+GIVE_SUCCES = 11
 
 
 class ChannelController(object):
@@ -40,9 +44,17 @@ class ChannelController(object):
             return TURN_NOT_ALLOWED, None
         else:
             if self.game.state == GAME_OVER:
-                return TURN_TAKEN_GAME_OVER, results
+                return TURN_SUCCES_GAME_OVER, results
             else:
-                return TURN_TAKEN, results
+                return TURN_SUCCES, results
+
+    def give_token(self, player, target):
+        if not self.game:
+            return GIVE_NO_GAME
+        allowed = self.game.spend_giveaway(player, target)
+        if not allowed:
+            return GIVE_NOT_ALLOWED
+        return GIVE_SUCCES
 
     def stop_game(self):
         if not self.game:

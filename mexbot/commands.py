@@ -122,15 +122,15 @@ class Mex(commands.Cog):
         print('Mex: loaded emojis')
 
     @commands.group('mex', invoke_without_command=True)
-    async def play(self, ctx, proxy_user=None):
-        channel_controller = self.get_channel_controller(ctx)
-        if proxy_user and (await self.bot.is_owner(ctx.message.author)):
-            # Check if a proxy user was specified by owner
+    async def play(self, ctx, proxy_user_mention=None):
+        player = ctx.message.author.mention
+        if proxy_user_mention and (await self.bot.is_owner(ctx.message.author)):
             try:
-                proxy_user = await self.get_member.convert(ctx, proxy_user)
+                proxy_user = await self.get_member.convert(ctx, proxy_user_mention)
+                player = proxy_user.mention
             except commands.MemberNotFound:
-                proxy_user = None
-        player = proxy_user.mention if proxy_user else ctx.message.author.mention
+                pass
+        channel_controller = self.get_channel_controller(ctx)
         flag, results = channel_controller.take_turn(player)
         if flag == TURN_ALREADY_ROLLED:
             await ctx.send(choice(Phrases.CHEAT).format(player))
@@ -138,9 +138,28 @@ class Mex(commands.Cog):
             await ctx.send(Phrases.NOT_DUELIST)
         else:
             await ctx.send(self.make_message_turn(ctx, results))
-            if flag == TURN_TAKEN_GAME_OVER:
+            if flag == TURN_SUCCES_GAME_OVER:
                 await ctx.send(Phrases.SEPARATOR)
                 await self.stop(ctx)
+
+    @play.group('give', aliases=['uitdelen'])
+    async def give(self, ctx, *args):
+        player = ctx.message.author.mention
+        channel_controller = self.get_channel_controller(ctx)
+        for mention in args:
+            try:
+                member = await self.get_member.convert(ctx, mention)
+            except commands.MemberNotFound:
+                await ctx.message.add_reaction(self.emojis['chip_red'])
+                continue
+            target = member.mention
+            flag = channel_controller.give_token(player, target)
+            if flag == GIVE_NO_GAME:
+                await ctx.message.add_reaction(self.emojis['chip_red'])
+            elif flag == GIVE_NOT_ALLOWED:
+                await ctx.message.add_reaction(self.emojis['chip_yellow'])
+            else:
+                await ctx.message.add_reaction(self.emojis['chip_green'])
 
     @play.group('reset')
     async def reset(self, ctx, roll_limit=None):
