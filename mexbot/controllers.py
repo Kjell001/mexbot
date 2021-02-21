@@ -4,7 +4,7 @@
 from mex import *
 
 # Constants
-DICE_STYLES = ('1929', 'casino')
+DICE_STYLES = ('1929', 'casino', 'valhalla')
 
 NO_GAME_FOUND = 0
 
