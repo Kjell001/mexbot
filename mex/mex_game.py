@@ -6,7 +6,7 @@ DICE_KEEP = Roll(VALUES_KEEP)
 DICE_GIVE = Roll(VALUES_GIVE)
 DICE_MEX = Roll(VALUES_MEX)
 LIMIT_MIN = 1
-LIMIT_MAX = 3
+LIMIT_MAX = 5
 LIMIT_DEFAULT = 3
 LIMIT_DUEL = 1
 STREAK = 3
@@ -87,6 +87,8 @@ class Game(object):
     def __init__(self, roll_limit=LIMIT_DEFAULT, players_allowed=None):
         self.tokens = dict()
         self.mex = 0
+        self.holdits_perm = 0
+        self.holdits_temp = 0
         self.limit = None
         self.limit_init = None
         self.players_allowed = None
@@ -107,6 +109,8 @@ class Game(object):
         self.players_allowed = players
 
     def refresh(self):
+        self.holdits_perm += self.holdits_temp
+        self.holdits_temp = 0
         self.players = list()
         self.giveaways = list()
         self.roll_low = None
@@ -135,7 +139,7 @@ class Game(object):
 
     def distribute_loser_tokens(self):
         for player in self.players_low:
-            self.add_tokens(player, self.mex + 1)
+            self.add_tokens(player, self.mex + self.holdits_perm + 1)
 
     def get_tokens(self):
         tokens_sorted = sorted(self.tokens.items(), key=lambda x: x[1], reverse=True)
@@ -171,6 +175,7 @@ class Game(object):
                 break
             elif self.roll_low and roll == self.roll_low and roll_num < self.limit:
                 # Check if this identical to lowest pair in game
+                self.holdits_temp += 1
                 results.interrupt()
                 break
             elif value1 in DICE_KEEP and fresh1:
@@ -192,6 +197,7 @@ class Game(object):
             # Player set new low
             self.players_low = [player]
             self.roll_low = roll_last.snapshot()
+            self.holdits_temp = 0
         self.add_tokens(ALL_PLAYERS, len(results.house))
         # Check if game is over
         if self.players_allowed and len(self.players) == len(self.players_allowed):
