@@ -35,6 +35,7 @@ bot.add_cog(Quiz(bot))
 
 
 def cleanup(mexbot):
+    print('Shutting down MexBot...')
     # Invoke saving ChannelController states
     mexbot.get_cog('Mex').cleanup()
     print('*In Luigi voice*: "Bye bye"')
