@@ -2,6 +2,7 @@
 
 # Basic
 from random import choice
+import pickle
 from .controllers import *
 from .helpers import *
 
@@ -12,6 +13,7 @@ from discord.ext import commands
 from mex import *
 
 HOME_GUILD_ID = 800402178673213450
+FILE_DUMP = 'dumps/channel_con_{}.dump'
 
 
 class Phrases(object):
@@ -60,14 +62,27 @@ class Mex(commands.Cog):
         self.channel_controllers = dict()
         self.emojis = None
 
-    def add_channel_controller(self, channel):
-        self.channel_controllers[channel.id] = ChannelController()
+    def add_channel_controller(self, ctx):
+        # Try loading a ChannelController dump, create new otherwise
+        try:
+            file = FILE_DUMP.format(ctx.channel.id)
+            channel_con = pickle.load(open(file, 'rb'))
+            print(f'Restored controller for #{ctx.channel} in {ctx.guild}')
+        except IOError:
+            channel_con = ChannelController()
+            print(f'Created controller for #{ctx.channel} in {ctx.guild}')
+        self.channel_controllers[ctx.channel.id] = channel_con
 
     def get_channel_controller(self, ctx):
         if ctx.channel.id not in self.channel_controllers:
-            self.channel_controllers[ctx.channel.id] = ChannelController()
-            print(f'Created controller for #{ctx.channel} in {ctx.guild}')
+            self.add_channel_controller(ctx)
         return self.channel_controllers[ctx.channel.id]
+
+    def cleanup(self):
+        for channel_id, channel_con in self.channel_controllers.items():
+            file = FILE_DUMP.format(channel_id)
+            pickle.dump(channel_con, open(file, 'wb'))
+            print(f'Stored controller in "./{file}"')
 
     def make_message_turn(self, ctx, results):
         channel_controller = self.get_channel_controller(ctx)
