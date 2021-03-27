@@ -2,7 +2,8 @@
 
 # Basic
 import os
-import asyncio
+import sys
+import signal
 
 # Discord
 import discord
@@ -30,19 +31,16 @@ async def on_command_error(ctx, error):
     raise error
 
 
+def cleanup(signalnum, _):
+    print(f'Received signal \'{signal.strsignal(signalnum)}\'')
+    # Invoke saving ChannelController states
+    bot.get_cog('Mex').cleanup()
+    print('*In Luigi voice*: "Bye bye"')
+    sys.exit()
+
+
+signal.signal(signal.SIGINT, cleanup)
+signal.signal(signal.SIGTERM, cleanup)
 bot.add_cog(Mex(bot))
 bot.add_cog(Quiz(bot))
-
-
-def cleanup(mexbot):
-    print('Shutting down MexBot...')
-    # Invoke saving ChannelController states
-    mexbot.get_cog('Mex').cleanup()
-    print('*In Luigi voice*: "Bye bye"')
-
-
-loop = asyncio.get_event_loop()
-try:
-    loop.run_until_complete(bot.start(TOKEN_DISCORD_BOT))
-except KeyboardInterrupt:
-    cleanup(bot)
+bot.run(TOKEN_DISCORD_BOT)
