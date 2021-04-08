@@ -78,6 +78,11 @@ class Mex(commands.Cog):
             self.add_channel_controller(ctx)
         return self.channel_controllers[ctx.channel.id]
 
+    def store_channel_controller(self, ctx):
+        channel_con = self.get_channel_controller(ctx)
+        file = FILE_DUMP.format(ctx.channel.id)
+        pickle.dump(channel_con, open(file, 'wb'))
+
     def cleanup(self):
         for channel_id, channel_con in self.channel_controllers.items():
             file = FILE_DUMP.format(channel_id)
@@ -153,6 +158,7 @@ class Mex(commands.Cog):
             await ctx.send(Phrases.NOT_DUELIST)
         else:
             await ctx.send(self.make_message_turn(ctx, results))
+            self.store_channel_controller(ctx)  # For Heroku
             if flag == TURN_SUCCES_GAME_OVER:
                 await ctx.send(Phrases.SEPARATOR)
                 await self.stop(ctx)
@@ -175,6 +181,7 @@ class Mex(commands.Cog):
                 await ctx.message.add_reaction(self.emojis['chip_yellow'])
             else:
                 await ctx.message.add_reaction(self.emojis['chip_green'])
+                self.store_channel_controller(ctx)  # For Heroku
 
     @play.group('reset')
     async def reset(self, ctx, roll_limit=None):
@@ -205,9 +212,11 @@ class Mex(commands.Cog):
             await ctx.send(choice(Phrases.DUEL).format(list_names(game.players_allowed)))
         elif flag == STOP_GAME_OVER:
             await ctx.send(self.make_message_conclusion(ctx, game))
+        self.store_channel_controller(ctx)  # For Heroku
         return flag
 
     @play.command('style')
     async def set_dice_style(self, ctx, dice_style=None):
         channel_controller = self.get_channel_controller(ctx)
         channel_controller.set_dice_style(dice_style)
+        self.store_channel_controller(ctx)  # For Heroku

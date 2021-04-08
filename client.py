@@ -39,8 +39,8 @@ def cleanup(signalnum, _):
     sys.exit()
 
 
-signal.signal(signal.SIGINT, cleanup)
-signal.signal(signal.SIGTERM, cleanup)
+# signal.signal(signal.SIGINT, cleanup)
+# signal.signal(signal.SIGTERM, cleanup)
 bot.add_cog(Mex(bot))
 bot.add_cog(Quiz(bot))
 bot.run(TOKEN_DISCORD_BOT)
