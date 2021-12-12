@@ -4,18 +4,22 @@
 import os
 import sys
 import signal
+import asyncio
 
 # Discord
 import discord
 from discord.ext.commands import CommandNotFound
 
 # Commands
-from mexbot import *
-from quiz import *
+import mexbot
+import quiz
+import lute
 
 TOKEN_DISCORD_BOT = os.getenv("TOKEN_DISCORD_BOT")
+TOKEN_DISCORD_LUTE = os.getenv("TOKEN_DISCORD_LUTE")
 
-bot = commands.Bot(command_prefix='!', help_command=None)
+# Set up MexBot
+bot = discord.ext.commands.Bot(command_prefix='!', help_command=None)
 
 
 @bot.event
@@ -25,7 +29,7 @@ async def on_ready():
 
 
 @bot.event
-async def on_command_error(ctx, error):
+async def on_command_error(_, error):
     if isinstance(error, CommandNotFound):
         return
     raise error
@@ -41,6 +45,32 @@ def cleanup(signalnum, _):
 
 # signal.signal(signal.SIGINT, cleanup)
 # signal.signal(signal.SIGTERM, cleanup)
-bot.add_cog(Mex(bot))
-bot.add_cog(Quiz(bot))
-bot.run(TOKEN_DISCORD_BOT)
+bot.add_cog(mexbot.Mex(bot))
+bot.add_cog(quiz.Quiz(bot))
+
+
+# Set up Lute
+LuteBot = discord.ext.commands.Bot(command_prefix='!', help_command=None)
+
+
+@LuteBot.event
+async def on_ready():
+    print('Logged in as {}'.format(LuteBot.user))
+    await LuteBot.change_presence(activity=discord.Game('Steenwijker Courant'))
+
+
+@LuteBot.event
+async def on_command_error(_, error):
+    if isinstance(error, CommandNotFound):
+        return
+    raise error
+
+
+LuteBot.add_cog(lute.Unlock(LuteBot))
+
+
+# Run both bots concurrently
+loop = asyncio.get_event_loop()
+loop.create_task(bot.start(TOKEN_DISCORD_BOT))
+loop.create_task(LuteBot.start(TOKEN_DISCORD_LUTE))
+loop.run_forever()

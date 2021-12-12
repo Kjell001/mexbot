@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
-
 # Basic
 import re
+from dateutil import parser
 
 # API request
 import requests
@@ -50,32 +50,29 @@ class Article:
         # Test whether this is an article
         assert content, 'Not an article URL.'
         # Basic info
-        self.published = info['published']
+        self.published = parser.isoparse(info['published'])
         self.updated = info['updated']
         self.section = info['homeSection']['name']
         self.authors = [a['name'] for a in info['authors']]
         # Title and lead
         self.title = content['title']
         self.lead = content['leadtext_raw']
+        # Image
+        images = find_items_recursively(info, 'href_full')
+        self.image = images[0] if images else None
         # Paragraphs
         elements = content['body']
         self.paragraphs = []
-        self.image = None
         header = None
         for el in elements:
-            images = find_items_recursively(el, 'href_full')
-            if images and not self.image:
-                # Store image specification
-                self.image = images[-1]
-            else:
-                el_type = el['type']
-                text = ''.join(find_items_recursively(el, 'text'))
-                if re.fullmatch(r'h\d', el_type):
-                    # Store header for next paragraph
-                    header = text
-                elif el_type == 'p':
-                    self.paragraphs.append(Paragraph(header, text))
-                    header = None
+            el_type = el['type']
+            text = ''.join(find_items_recursively(el, 'text'))
+            if re.fullmatch(r'h\d', el_type):
+                # Store header for next paragraph
+                header = text
+            elif el_type == 'p':
+                self.paragraphs.append(Paragraph(header, text))
+                header = None
 
     def __str__(self):
         items = [self.title, self.published, ', '.join(self.authors), self.lead]
@@ -90,7 +87,7 @@ class Paragraph:
 
     def __str__(self):
         if self.header:
-            return self.header + '\n\n' + self.text
+            return '[P]' + self.header + '\n\n' + self.text
         return self.text
 
 
