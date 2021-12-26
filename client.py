@@ -17,6 +17,9 @@ import lute
 
 TOKEN_DISCORD_BOT = os.getenv("TOKEN_DISCORD_BOT")
 TOKEN_DISCORD_LUTE = os.getenv("TOKEN_DISCORD_LUTE")
+FTP_HOST = os.getenv('FTP_HOST')
+FTP_USERNAME = os.getenv('FTP_USERNAME')
+FTP_PASSWORD = os.getenv('FTP_PASSWORD')
 
 # Set up MexBot
 bot = discord.ext.commands.Bot(command_prefix='!', help_command=None)
@@ -36,16 +39,16 @@ async def on_command_error(_, error):
 
 
 def cleanup(signalnum, _):
-    print(f'Received signal \'{signal.strsignal(signalnum)}\'')
+    print(f'- - -\nReceived signal \'{signal.strsignal(signalnum)}\'')
     # Invoke saving ChannelController states
     bot.get_cog('Mex').cleanup()
     print('*In Luigi voice*: "Bye bye"')
     sys.exit()
 
 
-# signal.signal(signal.SIGINT, cleanup)
-# signal.signal(signal.SIGTERM, cleanup)
-bot.add_cog(mexbot.Mex(bot))
+signal.signal(signal.SIGINT, cleanup)
+signal.signal(signal.SIGTERM, cleanup)
+bot.add_cog(mexbot.Mex(bot, FTP_HOST, FTP_USERNAME, FTP_PASSWORD))
 bot.add_cog(quiz.Quiz(bot))
 
 

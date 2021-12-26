@@ -1,6 +1,5 @@
 **/.idea/*
 *.pyc
-*.dump
 /scratchpad.py
 /dice-face-icons.ai
 

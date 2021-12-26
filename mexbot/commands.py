@@ -2,15 +2,16 @@
 
 # Basic
 from random import choice
-import pickle
 from .controllers import *
 from .helpers import *
+from warnings import warn
 
 # Discord
 from discord.ext import commands
 
 # Mex game
 from mex import *
+import ftp_instance
 
 HOME_GUILD_ID = 800402178673213450
 FILE_DUMP = 'dumps/channel_con_{}.dump'
@@ -19,7 +20,7 @@ FILE_DUMP = 'dumps/channel_con_{}.dump'
 class Phrases(object):
     START = (
         '{} werpt de teerling',
-        'De beurt is aan {}',
+        '{} is aan de beurt',
         '{} grijpt naar de dobbels',
         '{} hoopt op mex',
         '{} ruikt even aan de dobbelstenen',
@@ -27,12 +28,19 @@ class Phrases(object):
         '{} likt aan de dobbelstenen',
         '{} gooit de dobbels bijna van tafel',
         '{} probeert een trick shot',
-        'Geloof in het hart van de dobbelstenen {}!',
+        '{} gelooft in het hart van de dobbelstenen',
+        '{} gooit zonder te kijken',
+        '{} schudt de dobbelsten net iets te lang',
+        '{} werpt de dobbels in Mt. Doom'
+        '{} mengt zich in de strijd',
+        '{} vindt het stiekem wel spannend',
+        '{} denkt aan zijn lievelingsgetal',
+        '{} weet zeker dat het mex wordt'
     )
     CHEAT = (
         '{} CHEATOR COMPLETOR!',
         '{} eist een hertelling, maar de uitslag is hetzelfde',
-        '{}, je bent al aan de beurt geweest valsspelert!',
+        '{}, je bent al aan de beurt geweest vuile maltdrinker!',
         'Volgende potje mag je weer {}',
     )
     DUEL = (
@@ -40,6 +48,9 @@ class Phrases(object):
         '{} vechten het onderling uit',
         '{} moeten nog even door',
         '{}, er kan er maar één de laagste zijn!',
+        '{} trekken hun revolvers',
+        '{} wisselen een veelbetekenende blik',
+        '{} gaan een extra rondje niet uit de weg'
     )
     ALONE = 'Wie alleen speelt, verliest altijd...'
     START_WAIT = 'Er kan nog geen nieuwe game opgezet worden'
@@ -57,20 +68,39 @@ class Phrases(object):
 class Mex(commands.Cog):
     get_member = commands.MemberConverter()
 
-    def __init__(self, bot):
+    def __init__(self, bot, ftp_host, ftp_usr, ftp_pwd):
         self.bot = bot
         self.channel_controllers = dict()
+        self.ftp = ftp_instance.Connector(ftp_host, ftp_usr, ftp_pwd)
         self.emojis = None
 
-    def add_channel_controller(self, ctx):
-        # Try loading a ChannelController dump, create new otherwise
+    def store_channel_controller(self, channel_id):
+        channel_con = self.channel_controllers.get(channel_id)
+        assert channel_con, "No channel controller for this context."
+        fname = f'mexbot_{channel_id}.pickle'
         try:
-            file = FILE_DUMP.format(ctx.channel.id)
-            channel_con = pickle.load(open(file, 'rb'))
-            print(f'Restored controller for #{ctx.channel} in {ctx.guild}')
-        except IOError:
+            self.ftp.store_instance(channel_con, fname)
+            print(f'Stored controller to {fname} on {self.ftp.host}')
+        except ConnectionError:
+            warn(f'Could not store {fname} to {self.ftp.host} due to a '
+                 f'connection error')
+    
+    def restore_channel_controller(self, channel_id):
+        fname = f'mexbot_{channel_id}.pickle'
+        try:
+            if self.ftp.file_exists(fname):
+                channel_con = self.ftp.load_instance(fname)
+                print(f'Restored controller from {fname} on {self.ftp.host}')
+                return channel_con
+        except ConnectionError:
+            warn(f'Could not attempt to restore {fname} from {self.ftp.host} '
+                 f'due to a connection error')
+        return None
+
+    def add_channel_controller(self, ctx):
+        channel_con = self.restore_channel_controller(ctx.channel.id)
+        if not channel_con:
             channel_con = ChannelController()
-            print(f'Created controller for #{ctx.channel} in {ctx.guild}')
         self.channel_controllers[ctx.channel.id] = channel_con
 
     def get_channel_controller(self, ctx):
@@ -78,21 +108,14 @@ class Mex(commands.Cog):
             self.add_channel_controller(ctx)
         return self.channel_controllers[ctx.channel.id]
 
-    def store_channel_controller(self, ctx):
-        channel_con = self.get_channel_controller(ctx)
-        file = FILE_DUMP.format(ctx.channel.id)
-        pickle.dump(channel_con, open(file, 'wb'))
-
     def cleanup(self):
-        for channel_id, channel_con in self.channel_controllers.items():
-            file = FILE_DUMP.format(channel_id)
-            pickle.dump(channel_con, open(file, 'wb'))
-            print(f'Stored controller in "./{file}"')
+        for channel_id in self.channel_controllers:
+            self.store_channel_controller(channel_id)
 
     def make_message_turn(self, ctx, results):
-        channel_controller = self.get_channel_controller(ctx)
-        game = channel_controller.game
-        game_count = channel_controller.game_count
+        channel_con = self.get_channel_controller(ctx)
+        game = channel_con.game
+        game_count = channel_con.game_count
         player = results.player
         # Announce
         line_user = choice(Phrases.START).format(player)
@@ -103,7 +126,7 @@ class Mex(commands.Cog):
         rolls, labels, charms = results.get()
         for i in range(len(rolls)):
             str_label = f'` {labels[i]} `'
-            str_roll = channel_controller.get_roll_string(self.emojis, rolls[i], True)
+            str_roll = channel_con.get_roll_string(self.emojis, rolls[i], True)
             str_charms = '  '.join(Phrases.CHARM[c] for c in charms[i])
             lines_roll.append('{}  {}{}{}'.format(
                 str_label,
@@ -115,7 +138,7 @@ class Mex(commands.Cog):
         line_game = '{} {} laag met {}'.format(
             list_names(game.players_low),
             'zijn' if len(game.players_low) > 1 else 'is',
-            channel_controller.get_roll_string(self.emojis, game.roll_low, False)
+            channel_con.get_roll_string(self.emojis, game.roll_low, False)
         )
         if game.limit < game.limit_init:
             line_game = f'Mex in {game.limit}  ◇  ' + line_game
@@ -142,11 +165,11 @@ class Mex(commands.Cog):
         print('Mex: loaded emojis')
 
     @commands.group('mex', invoke_without_command=True)
-    async def play(self, ctx, proxy_user_mention=None):
+    async def play(self, ctx, proxy_user=None):
         player = ctx.message.author.mention
-        if proxy_user_mention and (await self.bot.is_owner(ctx.message.author)):
+        if proxy_user and (await self.bot.is_owner(ctx.message.author)):
             try:
-                proxy_user = await self.get_member.convert(ctx, proxy_user_mention)
+                proxy_user = await self.get_member.convert(ctx, proxy_user)
                 player = proxy_user.mention
             except commands.MemberNotFound:
                 pass
@@ -158,7 +181,6 @@ class Mex(commands.Cog):
             await ctx.send(Phrases.NOT_DUELIST)
         else:
             await ctx.send(self.make_message_turn(ctx, results))
-            self.store_channel_controller(ctx)  # For Heroku
             if flag == TURN_SUCCES_GAME_OVER:
                 await ctx.send(Phrases.SEPARATOR)
                 await self.stop(ctx)
@@ -181,7 +203,6 @@ class Mex(commands.Cog):
                 await ctx.message.add_reaction(self.emojis['chip_yellow'])
             else:
                 await ctx.message.add_reaction(self.emojis['chip_green'])
-                self.store_channel_controller(ctx)  # For Heroku
 
     @play.group('reset')
     async def reset(self, ctx, roll_limit=None):
@@ -207,16 +228,18 @@ class Mex(commands.Cog):
         game = channel_controller.game
         flag = channel_controller.stop_game()
         if flag == STOP_GAME_UNDECIDED:
-            await ctx.send(Phrases.STOP_WAIT)
+            msg = Phrases.STOP_WAIT
+            await ctx.send(msg)
         elif flag == STOP_GAME_DUEL:
-            await ctx.send(choice(Phrases.DUEL).format(list_names(game.players_allowed)))
+            msg = choice(Phrases.DUEL).format(list_names(game.players_allowed))
+            await ctx.send(msg)
         elif flag == STOP_GAME_OVER:
-            await ctx.send(self.make_message_conclusion(ctx, game))
-        self.store_channel_controller(ctx)  # For Heroku
+            msg = self.make_message_conclusion(ctx, game)
+            await ctx.send(msg)
+            self.store_channel_controller(ctx.channel.id)
         return flag
 
     @play.command('style')
     async def set_dice_style(self, ctx, dice_style=None):
         channel_controller = self.get_channel_controller(ctx)
         channel_controller.set_dice_style(dice_style)
-        self.store_channel_controller(ctx)  # For Heroku
