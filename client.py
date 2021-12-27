@@ -12,7 +12,6 @@ from discord.ext.commands import CommandNotFound
 
 # Commands
 import mexbot
-##import quiz
 import quiz_interactive
 import lute
 
@@ -50,7 +49,6 @@ def cleanup(signalnum, _):
 signal.signal(signal.SIGINT, cleanup)
 signal.signal(signal.SIGTERM, cleanup)
 bot.add_cog(mexbot.Mex(bot, FTP_HOST, FTP_USERNAME, FTP_PASSWORD))
-##bot.add_cog(quiz.Quiz(bot))
 bot.add_cog(quiz_interactive.Quiz(bot))
 
 
