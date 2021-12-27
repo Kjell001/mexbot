@@ -12,7 +12,8 @@ from discord.ext.commands import CommandNotFound
 
 # Commands
 import mexbot
-import quiz
+##import quiz
+import quiz_interactive
 import lute
 
 TOKEN_DISCORD_BOT = os.getenv("TOKEN_DISCORD_BOT")
@@ -49,7 +50,8 @@ def cleanup(signalnum, _):
 signal.signal(signal.SIGINT, cleanup)
 signal.signal(signal.SIGTERM, cleanup)
 bot.add_cog(mexbot.Mex(bot, FTP_HOST, FTP_USERNAME, FTP_PASSWORD))
-bot.add_cog(quiz.Quiz(bot))
+##bot.add_cog(quiz.Quiz(bot))
+bot.add_cog(quiz_interactive.Quiz(bot))
 
 
 # Set up Lute
@@ -75,5 +77,5 @@ LuteBot.add_cog(lute.Unlock(LuteBot))
 # Run both bots concurrently
 loop = asyncio.get_event_loop()
 loop.create_task(bot.start(TOKEN_DISCORD_BOT))
-loop.create_task(LuteBot.start(TOKEN_DISCORD_LUTE))
+#loop.create_task(LuteBot.start(TOKEN_DISCORD_LUTE))
 loop.run_forever()
