@@ -12,11 +12,14 @@ import requests
 import json
 from html import unescape
 
+HOME_GUILD_ID = 800402178673213450
+
 
 class Quiz(commands.Cog):
     OPENTDB_ENDPOINT = 'https://opentdb.com/api.php'
     
     def __init__(self, bot):
+        self.emojis = None
         self.bot = bot
         self.questions = dict()
     
@@ -39,7 +42,10 @@ class Quiz(commands.Cog):
     
     @commands.Cog.listener()
     async def on_ready(self):
-        print('QuizInteractive: loaded commands')
+        print('Quiz: loaded commands')
+        home_guild_emojis = self.bot.get_guild(HOME_GUILD_ID).emojis
+        self.emojis = dict((e.name, str(e)) for e in home_guild_emojis)
+        print('Quiz: loaded emojis')
 
     @commands.command('ramswoertherevival', aliases=['rwr'])
     async def quiz(self, ctx):
@@ -50,7 +56,7 @@ class Quiz(commands.Cog):
             print(inst)
             return
         # Send message
-        question = Question(question, answers)
+        question = Question(question, answers, ctx.author, self.emojis)
         message_id = await question.send(ctx)
         self.questions[message_id] = question
     
@@ -58,8 +64,7 @@ class Quiz(commands.Cog):
     async def on_reaction_add(self, reaction, user):
         if reaction.message.id in self.questions:
             if user.id == self.bot.user.id:
-                print('My reaction!')
                 return
             await reaction.remove(user)
             question = self.questions[reaction.message.id]
-            question.set_player_score(user, reaction)
+            await question.process_reaction(reaction, user)

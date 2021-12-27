@@ -14,7 +14,6 @@ from mex import *
 import ftp_instance
 
 HOME_GUILD_ID = 800402178673213450
-FILE_DUMP = 'dumps/channel_con_{}.dump'
 
 
 class Phrases(object):

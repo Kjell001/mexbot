@@ -77,5 +77,5 @@ LuteBot.add_cog(lute.Unlock(LuteBot))
 # Run both bots concurrently
 loop = asyncio.get_event_loop()
 loop.create_task(bot.start(TOKEN_DISCORD_BOT))
-#loop.create_task(LuteBot.start(TOKEN_DISCORD_LUTE))
+loop.create_task(LuteBot.start(TOKEN_DISCORD_LUTE))
 loop.run_forever()
