@@ -81,16 +81,16 @@ async def cleanup2(signalnum):
 # Run both bots concurrently
 loop = asyncio.get_event_loop()
 loop.create_task(bot.start(TOKEN_DISCORD_BOT))
-#loop.create_task(LuteBot.start(TOKEN_DISCORD_LUTE))
+loop.create_task(LuteBot.start(TOKEN_DISCORD_LUTE))
 # Add signal handlers for proper cleanup
-signal.signal(signal.SIGINT, cleanup)
-signal.signal(signal.SIGTERM, cleanup)
-# loop.add_signal_handler(
-#     signal.SIGINT,
-#     lambda: asyncio.ensure_future(cleanup2(signal.SIGINT))
-# )
-# loop.add_signal_handler(
-#     signal.SIGTERM,
-#     lambda: asyncio.ensure_future(cleanup2(signal.SIGTERM))
-# )
+# signal.signal(signal.SIGINT, cleanup)
+# signal.signal(signal.SIGTERM, cleanup)
+loop.add_signal_handler(
+    signal.SIGINT,
+    lambda: asyncio.ensure_future(cleanup2(signal.SIGINT))
+)
+loop.add_signal_handler(
+    signal.SIGTERM,
+    lambda: asyncio.ensure_future(cleanup2(signal.SIGTERM))
+)
 loop.run_forever()
