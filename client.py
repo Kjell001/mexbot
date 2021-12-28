@@ -38,16 +38,6 @@ async def on_command_error(_, error):
     raise error
 
 
-def cleanup(signalnum, _):
-    print(f'- - -\nReceived signal \'{signal.strsignal(signalnum)}\'')
-    # Invoke saving ChannelController states
-    bot.get_cog('Mex').cleanup()
-    print('*In Luigi voice*: "Bye bye"')
-    sys.exit()
-
-
-signal.signal(signal.SIGINT, cleanup)
-signal.signal(signal.SIGTERM, cleanup)
 bot.add_cog(mexbot.Mex(bot, FTP_HOST, FTP_USERNAME, FTP_PASSWORD))
 bot.add_cog(quiz_interactive.Quiz(bot))
 
@@ -72,8 +62,28 @@ async def on_command_error(_, error):
 LuteBot.add_cog(lute.Unlock(LuteBot))
 
 
+# async def cleanup(signalnum):
+def cleanup(signalnum, _):
+    print(f'- - -\nReceived signal \'{signal.strsignal(signalnum)}\'')
+    bot.get_cog('Mex').cleanup()
+    # await bot.get_cog('Quiz').cleanup()
+    print('*In Luigi voice*: "Bye bye"')
+    sys.exit()
+
+
 # Run both bots concurrently
 loop = asyncio.get_event_loop()
 loop.create_task(bot.start(TOKEN_DISCORD_BOT))
-loop.create_task(LuteBot.start(TOKEN_DISCORD_LUTE))
+#loop.create_task(LuteBot.start(TOKEN_DISCORD_LUTE))
+# Add signal handlers for proper cleanup
+signal.signal(signal.SIGINT, cleanup)
+signal.signal(signal.SIGTERM, cleanup)
+# loop.add_signal_handler(
+#     signal.SIGINT,
+#     lambda: asyncio.ensure_future(cleanup(signal.SIGINT))
+# )
+# loop.add_signal_handler(
+#     signal.SIGTERM,
+#     lambda: asyncio.ensure_future(cleanup(signal.SIGTERM))
+# )
 loop.run_forever()

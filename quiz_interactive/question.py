@@ -63,9 +63,9 @@ class Question(object):
         else:
             self.player_scores[player] = self.POINTS_INCORRECT
     
-    async def finish(self, player):
+    async def finish(self, player=None):
         # Only requesting player can finish
-        if player != self.player_request:
+        if player and player != self.player_request:
             return
         # Requesting player gets incorrect if not chosen answer
         if self.player_request not in self.player_scores:

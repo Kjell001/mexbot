@@ -40,6 +40,12 @@ class Quiz(commands.Cog):
         answers = [answer_correct] + answers_incorrect
         return question, answers
     
+    def remove_question(self, message_id):
+        del self.questions[message_id]
+    
+    async def cleanup(self):
+        [await q.finish() for q in self.questions.values()]
+    
     @commands.Cog.listener()
     async def on_ready(self):
         print('Quiz: loaded commands')
