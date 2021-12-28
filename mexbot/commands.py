@@ -3,6 +3,7 @@
 # Basic
 from random import choice
 from .controllers import *
+import ftp_instance
 from .helpers import *
 from warnings import warn
 
@@ -11,7 +12,6 @@ from discord.ext import commands
 
 # Mex game
 from mex import *
-import ftp_instance
 
 HOME_GUILD_ID = 800402178673213450
 

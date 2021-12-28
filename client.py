@@ -39,7 +39,7 @@ async def on_command_error(_, error):
 
 
 bot.add_cog(mexbot.Mex(bot, FTP_HOST, FTP_USERNAME, FTP_PASSWORD))
-bot.add_cog(quiz_interactive.Quiz(bot))
+bot.add_cog(quiz_interactive.Quiz(bot, FTP_HOST, FTP_USERNAME, FTP_PASSWORD))
 
 
 # Set up Lute
@@ -65,6 +65,7 @@ LuteBot.add_cog(lute.Unlock(LuteBot))
 def cleanup(signalnum, _):
     print(f'- - -\nReceived signal \'{signal.strsignal(signalnum)}\'')
     bot.get_cog('Mex').cleanup()
+    bot.get_cog('Quiz').cleanup()
     print('*In Luigi voice*: "Bye bye"')
     sys.exit()
 
@@ -72,7 +73,7 @@ def cleanup(signalnum, _):
 async def cleanup2(signalnum):
     print(f'- - -\nReceived signal \'{signal.strsignal(signalnum)}\'')
     bot.get_cog('Mex').cleanup()
-    await bot.get_cog('Quiz').cleanup()
+    await bot.get_cog('Quiz').cleanup2()
     print('*In Luigi voice*: "Bye bye"')
     sys.exit()
 

@@ -9,7 +9,6 @@ class Phrases(object):
 
 
 class Question(object):
-    NUM_CHOICES = 4
     ICONS_CHOICES = (
         'choice_1',
         'choice_2',
@@ -45,7 +44,7 @@ class Question(object):
         player = user.mention
         icon = reaction.emoji
         if icon.name == self.ICON_FINISH:
-            await self.finish(player)
+            return await self.finish(player)
         elif icon.name in self.ICONS_CHOICES:
             self.set_player_score(player, icon)
     
@@ -99,8 +98,8 @@ class Question(object):
                 icon = self.emojis[self.ICON_INCORRECT]
             lines_answers.append(f'{icon}  {answer}')
         # Summarise quiz results
-        losers = [p for p, s in self.player_scores.items() if s < 0]
         winners = [p for p, s in self.player_scores.items() if s > 0]
+        losers = [p for p, s in self.player_scores.items() if s <= 0]
         line_losers = f'` {self.POINTS_INCORRECT:+1d} pts ` {", ".join(losers)}'
         line_winners = f'` {self.POINTS_CORRECT:+1d} pts ` {", ".join(winners)}'
         # Collect appropriate content lines
