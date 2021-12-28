@@ -34,6 +34,11 @@ class Question(object):
         self.make_content()
         self.message = None
     
+    def get_guild_id(self):
+        if self.message:
+            return self.message.guild.id
+        return None
+    
     def shuffle_answers(self):
         indices = list(range(len(self.answers)))
         shuffle(indices)

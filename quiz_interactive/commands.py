@@ -5,6 +5,7 @@
 from .question import *
 from .controllers import *
 import ftp_instance
+from warnings import warn
 
 # Discord
 from discord.ext import commands
@@ -90,7 +91,11 @@ class Quiz(commands.Cog):
             self.store_guild_controller(guild_id)
             
     async def cleanup2(self):
-        [await q.finish() for q in self.questions.values()]
+        for question in self.questions.values():
+            scores = await question.finish()
+            guild_id = question.message.guild.id
+            if guild_id:
+                self.process_scores(scores, guild_id)
         for guild_id in self.guild_controllers:
             self.store_guild_controller(guild_id)
     
