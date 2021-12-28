@@ -62,11 +62,17 @@ async def on_command_error(_, error):
 LuteBot.add_cog(lute.Unlock(LuteBot))
 
 
-# async def cleanup(signalnum):
 def cleanup(signalnum, _):
     print(f'- - -\nReceived signal \'{signal.strsignal(signalnum)}\'')
     bot.get_cog('Mex').cleanup()
-    # await bot.get_cog('Quiz').cleanup()
+    print('*In Luigi voice*: "Bye bye"')
+    sys.exit()
+
+
+async def cleanup2(signalnum):
+    print(f'- - -\nReceived signal \'{signal.strsignal(signalnum)}\'')
+    bot.get_cog('Mex').cleanup()
+    await bot.get_cog('Quiz').cleanup()
     print('*In Luigi voice*: "Bye bye"')
     sys.exit()
 
@@ -80,10 +86,10 @@ signal.signal(signal.SIGINT, cleanup)
 signal.signal(signal.SIGTERM, cleanup)
 # loop.add_signal_handler(
 #     signal.SIGINT,
-#     lambda: asyncio.ensure_future(cleanup(signal.SIGINT))
+#     lambda: asyncio.ensure_future(cleanup2(signal.SIGINT))
 # )
 # loop.add_signal_handler(
 #     signal.SIGTERM,
-#     lambda: asyncio.ensure_future(cleanup(signal.SIGTERM))
+#     lambda: asyncio.ensure_future(cleanup2(signal.SIGTERM))
 # )
 loop.run_forever()
